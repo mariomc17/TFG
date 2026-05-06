@@ -7,13 +7,15 @@ import json
 from tqdm import tqdm
 
 ###########################################################################################
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_CSV = os.path.join(REPO_ROOT, "csv")
-CSV_FISICA = '/TFG_F/galaxias_sdss.csv'
-DIR_IMAGENES = '/TFG_F/scripts (GitHub)/recorte_elipse/galaxias_elipse'
-DIR_H5 = os.path.join(REPO_ROOT, "h5")
-HDF5_SALIDA = '/TFG_F/galaxias_dataset_sin_rgb.csv'
+# Rutas absolutas del servidor
+DIR_BASE = '/TFG_F'
+
+CSV_FISICA = os.path.join(DIR_BASE, 'galaxias_sdss.csv')
+DIR_IMAGENES = os.path.join(DIR_BASE, 'scripts (GitHub)', 'recorte_elipse', 'galaxias_elipse') 
+
+# Creamos una carpeta h5 limpia dentro de tu TFG_F para que no quede todo tirado
+DIR_H5 = os.path.join(DIR_BASE, 'h5')
+HDF5_SALIDA = os.path.join(DIR_H5, 'dataset_galaxias_sin_rgb.h5') # ¡Corregido a .h5!
 
 if not os.path.exists(DIR_H5):
     os.makedirs(DIR_H5)
@@ -23,7 +25,6 @@ COLUMNAS_FISICAS = [
     'SFR', 'SFR_ERR', 'EA', 'EA_ERR', 'MET', 'MET_ERR',
     'RADIO_P', 'RADIO_P_ERR', 'G_R', 'G_R_ERR', 'ESCALA_KPC_PX', 'ESCALA_KPC_PX_ERR'
 ]
-
 IMG_SIZE = 512
 ###########################################################################################
 
