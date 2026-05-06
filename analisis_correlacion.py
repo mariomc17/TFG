@@ -3,21 +3,19 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as plt_sns
+from tqdm import tqdm
 
-###########################################################################################
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV_SDSS = os.path.join(DIR_CSV, "galaxias_sdss.csv")
-###########################################################################################
 
-def estudio_correlacion_estocastica(df):
-    todas_variables = [
-        'REDSHIFT', 'LOG_MS', 'SFR', 'EA', 'MET', 'RADIO_P', 'G_R',
-        'REDSHIFT_ERR', 'LOG_MS_ERR', 'SFR_ERR', 'EA_ERR', 'MET_ERR', 'RADIO_P_ERR', 'G_R_ERR'
+def estudio_correlacion_estocastica(df, pbar):
+    variables_nominales = [
+        'REDSHIFT', 'LOG_MS', 'SFR', 'EA', 'MET', 'RADIO_P', 'G_R', 'ESCALA_KPC_PX'
     ]
     
-    columnas_validas = [col for col in todas_variables if col in df.columns]
+    columnas_validas = [col for col in variables_nominales if col in df.columns]
     df_corr = df[columnas_validas]
     
     columnas_no_constantes = df_corr.columns[df_corr.nunique() > 1]
@@ -27,29 +25,73 @@ def estudio_correlacion_estocastica(df):
         print(f"\nColumnas excluidas por ser constantes: {', '.join(columnas_constantes)}")
             
     df_final = df_corr[columnas_no_constantes]
-    matriz_corr = df_final.corr(method='pearson').abs()
+    pbar.update(1)
+
+    limite_inf = df_final.quantile(0.01)
+    limite_sup = df_final.quantile(0.99)
+    
+    mascara = ~((df_final < limite_inf) | (df_final > limite_sup)).any(axis=1)
+    df_filtrado = df_final[mascara]
+    print(f"Galaxias originales: {len(df_final)} | Galaxias tras el filtro: {len(df_filtrado)}")
+    
+    matriz_corr = df_filtrado.corr(method='pearson').abs()
     mask = np.tril(np.ones_like(matriz_corr, dtype=bool), k=-1)
     
-    plt.figure(figsize=(14, 11))
-    ax = plt_sns.heatmap(matriz_corr, annot=True, fmt=".2f", cmap='Reds', vmin=0, vmax=1, square=True, linewidths=.5, mask=mask, cbar_kws={"shrink": .8, "label": "Valor absoluto de Pearson (|r|)"})
+    plt.figure(figsize=(10, 8))
+    ax = plt_sns.heatmap(
+        matriz_corr, 
+        annot=True, 
+        fmt=".2f", 
+        cmap='Reds', 
+        vmin=0, 
+        vmax=1, 
+        square=True, 
+        linewidths=.5, 
+        mask=mask, 
+        cbar_kws={"shrink": .8, "label": "Valor absoluto de Pearson (|r|)"}
+    )
     
-    num_nominales = len([col for col in columnas_no_constantes if not col.endswith('_ERR')])
-    ax.axhline(num_nominales, color='black', linewidth=1.5, alpha=0.8, linestyle="--")
-    ax.axvline(num_nominales, color='black', linewidth=1.5, alpha=0.8, linestyle="--")
-    
-    plt.title("Matriz de correlación (parámetros y errores)", fontsize=16, pad=5)
+    plt.title("Matriz de correlación absoluta", fontsize=16, pad=20)
     plt.tight_layout()
     plt.show()
+    pbar.update(1)   
+
+    df_sample = df_filtrado 
+        
+    pair_plot = plt_sns.pairplot(
+        df_sample, 
+        kind="hist",           
+        diag_kind="kde",       
+        corner=True,
+        height=5,
+        aspect=1,
+    )
+    
+    pair_plot.fig.suptitle("Análisis distribucional multidimensional de variables astrofísicas", y=0.98, fontsize=18)
+    
+    pair_plot.fig.subplots_adjust(top=0.99, bottom=0.1, left=0.1, right=0.95, wspace=0.1, hspace=0.1)
+    
+    for ax in pair_plot.axes.flatten():
+        if ax is not None:
+            ax.tick_params(axis='x', rotation=45)
+            ax.xaxis.label.set_size(10)
+            ax.yaxis.label.set_size(10)
+            
+    plt.show()
+    pbar.update(1)
 
 def main():
     if not os.path.exists(RUTA_CSV_SDSS):
         print(f"Error: no se encuentra {RUTA_CSV_SDSS}")
         return
 
-    df_sdss = pd.read_csv(RUTA_CSV_SDSS)
-    df_limpio = df_sdss[(df_sdss > -100).all(axis=1)].dropna()
+    with tqdm(total=4, desc="Progreso del análisis", unit="fase") as pbar:
+        df_sdss = pd.read_csv(RUTA_CSV_SDSS)
 
-    estudio_correlacion_estocastica(df_limpio)
+        df_limpio = df_sdss[(df_sdss > -100).all(axis=1)].dropna()
+        pbar.update(1)
+
+        estudio_correlacion_estocastica(df_limpio, pbar)
 
 if __name__ == "__main__":
     main()

@@ -27,7 +27,7 @@ RUTA_CSV_UNET = os.path.join(DIR_CSV, "analisis_brazos.csv")
 if not os.path.exists(DIR_CSV):
     os.makedirs(DIR_CSV)
 
-MAX_ARCHIVOS = 100
+MAX_ARCHIVOS = None
 LADO_P = 8
 ###########################################################################################
 
@@ -39,7 +39,7 @@ def main():
     start_time = time.time()
 
     if not os.path.exists(DIR_IMAGENES):
-        print(f"Error: No se encuentra la carpeta {DIR_IMAGENES}")
+        print(f"Error: no se encuentra la carpeta {DIR_IMAGENES}")
         return
 
     archivos_en_carpeta = [f for f in os.listdir(DIR_IMAGENES) if f.lower().endswith('.png')]
@@ -174,8 +174,8 @@ def main():
         ax_scat1.set_xlabel("% Intensidad en el canal Rojo (R)", fontsize=13)
         ax_scat1.set_ylabel("% Intensidad en canal Azul (B)", fontsize=13)
         ax_scat1.grid(True, linestyle='--', alpha=0.5)
-        ax_scat1.text(0.05, 0.95, "Galaxias Tardías (Azules)", transform=ax_scat1.transAxes, color="#1E9AE7", fontweight='bold', va='top')
-        ax_scat1.text(0.95, 0.05, "Galaxias Tempranas (Rojas)", transform=ax_scat1.transAxes, color="#EB1224", fontweight='bold', ha='right')
+        ax_scat1.text(0.05, 0.95, "Galaxias tardías (azules)", transform=ax_scat1.transAxes, color="#1E9AE7", fontweight='bold', va='top')
+        ax_scat1.text(0.95, 0.05, "Galaxias tempranas (rojas)", transform=ax_scat1.transAxes, color="#EB1224", fontweight='bold', ha='right')
 
         bp = ax_box.boxplot([df['p_r'], df['p_g'], df['p_b']], patch_artist=True, tick_labels=['% Rojo', '% Verde', '% Azul'])
         colors = ["#EB1224", "#13BB5F", "#1E9AE7"]

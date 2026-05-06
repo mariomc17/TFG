@@ -11,7 +11,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss")
 DIR_TXT = os.path.join(REPO_ROOT, "txt")
-NOMBRE_TXT = "galaxias_anomalias.txt"
+NOMBRE_TXT = "galaxias_artefactos.txt"
 TXT_PATH = os.path.join(DIR_TXT, NOMBRE_TXT)
 
 if not os.path.exists(DIR_TXT):

@@ -47,9 +47,7 @@ def analizar_cielo(file):
         secciones_mean = [np.mean(brightness[y:y+lado, x:x+lado]) for y, x in secciones_cielo]
 
         cielo_mean_bruto = np.mean(secciones_mean)
-        cielo_median_bruto = np.median(secciones_mean)
         cielo_std_bruto = np.std(secciones_mean)
-        cielo_var_bruto = np.var(secciones_mean) 
         
         limite_bruto = cielo_mean_bruto + (3 * cielo_std_bruto)
     
@@ -67,9 +65,7 @@ def analizar_cielo(file):
             secciones_limpias = secciones_mean
 
         cielo_mean_limpia = np.mean(secciones_limpias)          
-        cielo_median_limpia = np.median(secciones_limpias)      
         cielo_std_limpia = np.std(secciones_limpias)
-        cielo_var_limpia = np.var(secciones_limpias)
 
         limite_total = cielo_mean_limpia + (3 * cielo_std_limpia)
 
@@ -87,15 +83,7 @@ def analizar_cielo(file):
 
         return {
             "OBJID": obj_id, 
-            "Mean_Bruta": cielo_mean_bruto,
-            "Median_Bruta": cielo_median_bruto,
-            "Desviación_Bruta": cielo_std_bruto,
-            "Varianza_Bruta": cielo_var_bruto,
             "LC_Bruto": limite_bruto,
-            "Mean_Limpia": cielo_mean_limpia,
-            "Median_Limpia": cielo_median_limpia, 
-            "Desviación_Limpia": cielo_std_limpia,
-            "Varianza_Limpia": cielo_var_limpia,
             "LC_Final": limite_total,
             "LC_R": LC_R,
             "LC_G": LC_G,
@@ -116,7 +104,6 @@ def main():
     total_files = len(files)
 
     if total_files > 0:
-        print("Iniciando análisis de cielo...")
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             resultados_iterador = tqdm(executor.map(analizar_cielo, files), total=total_files, desc="Procesando", unit=" galaxias")
             for resultado in resultados_iterador:
@@ -129,60 +116,23 @@ def main():
         df_cielo.to_csv(CSV_PATH, index=False)
         print(f"Archivo generado en: {CSV_PATH}")
         
-        fig, axs = plt.subplots(2, 3, figsize=(16, 10))
-        fig.suptitle("Evolución de estadísticas del cielo", fontsize=16)
-
-        color_bruto = 'indianred'
-        axs[0, 0].hist(df_cielo['Median_Bruta'], bins=50, color=color_bruto, edgecolor='black', alpha=0.8)
-        axs[0, 0].set_title("Mediana Bruta")
-        axs[0, 0].set_xlabel("Brillo")
-        axs[0, 0].set_ylabel("Nº de galaxias")
-
-        axs[0, 1].hist(df_cielo['Mean_Bruta'], bins=50, color=color_bruto, edgecolor='black', alpha=0.8)
-        axs[0, 1].set_title("Media Bruta")
-        axs[0, 1].set_xlabel("Brillo")
-
-        axs[0, 2].hist(df_cielo['Desviación_Bruta'], bins=50, color=color_bruto, edgecolor='black', alpha=0.8)
-        axs[0, 2].set_title("Desviación Bruta")
-        axs[0, 2].set_xlabel("Desviación")
-        axs[0, 2].set_yscale('log')
-
-        color_limpio = 'mediumseagreen'
-        axs[1, 0].hist(df_cielo['Median_Limpia'], bins=50, color=color_limpio, edgecolor='black', alpha=0.8)
-        axs[1, 0].set_title("Mediana Limpia")
-        axs[1, 0].set_xlabel("Brillo")
-        axs[1, 0].set_ylabel("Nº de galaxias")
-
-        axs[1, 1].hist(df_cielo['Mean_Limpia'], bins=50, color=color_limpio, edgecolor='black', alpha=0.8)
-        axs[1, 1].set_title("Media Limpia")
-        axs[1, 1].set_xlabel("Brillo")
-
-        axs[1, 2].hist(df_cielo['Desviación_Limpia'], bins=80, color=color_limpio, edgecolor='black', alpha=0.8)
-        axs[1, 2].set_title("Desviación Limpia")
-        axs[1, 2].set_xlabel("Desviación")
-        axs[1, 2].set_yscale('log')
-
-        for ax in axs.flat:
-            ax.grid(axis='y', linestyle='--', alpha=0.5)
-
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.figure(figsize=(10, 6))
         
-        fig2, axs2 = plt.subplots(1, 2, figsize=(14, 5))
-        fig2.suptitle("Evolución de $LC$", fontsize=16)
-
-        axs2[0].hist(df_cielo['LC_Bruto'], bins=50, color=color_bruto, edgecolor='black', alpha=0.8)
-        axs2[0].set_title("$LC$ Bruto (Antes de Tukey)")
-        axs2[0].set_xlabel("Brillo de Límite de Cielo")
-        axs2[0].set_ylabel("Nº de galaxias")
-
-        axs2[1].hist(df_cielo['LC_Final'], bins=50, color=color_limpio, edgecolor='black', alpha=0.8)
-        axs2[1].set_title("$LC$ Final (Después de Tukey)")
-        axs2[1].set_xlabel("Brillo de Límite de Cielo")
-        axs2[1].set_ylabel("Nº de galaxias")
+        plt.hist(df_cielo['LC_Bruto'], bins=80, range=(0, 600), color='indianred', 
+                 edgecolor='darkred', alpha=0.6, label='$LC_{bruto}$ (Sin filtro de Tukey)')
         
-        for ax in axs2.flat:
-            ax.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.hist(df_cielo['LC_Final'], bins=80, range=(0, 600), color='mediumseagreen', 
+                 edgecolor='darkgreen', alpha=0.8, label='$LC_{final}$ (Con filtro de Tukey)')
+        
+        plt.title('Comparativa de estimadores del Límite de Cielo ($LC$)', fontsize=16, pad=15)
+        plt.xlabel('Intensidad lumínica umbral ($LC$)', fontsize=12)
+        plt.ylabel('Número de galaxias', fontsize=12)
 
+        plt.xlim(50,400)
+        
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.legend(fontsize=12, loc='upper right')
+                
         plt.tight_layout()
         plt.show()
 

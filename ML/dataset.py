@@ -18,6 +18,8 @@ class GalaxiasFisicasDataset(Dataset):
             self.stats = json.loads(f.attrs['stats'])
             self.columnas_fisicas = json.loads(f.attrs['columnas_fisicas'])
             
+        print(f"Dataset HDF5 enganchado: {self.length} galaxias listas para procesar.")
+            
         self.indices_vars = []
         self.indices_errs = []
         
@@ -70,7 +72,7 @@ class GalaxiasFisicasDataset(Dataset):
         fisica_vector = torch.tensor(vect_final, dtype=torch.float32)
         fisica_vector = torch.clamp(fisica_vector, 0.0, 1.0)
         
-        rgb_np = self.h5_file['rgb'][idx]
-        rgb_vector = torch.tensor(rgb_np, dtype=torch.float32)
+        # rgb_np = self.h5_file['rgb'][idx]
+        # rgb_vector = torch.tensor(rgb_np, dtype=torch.float32)
         
-        return image, fisica_vector, rgb_vector
+        return image, fisica_vector

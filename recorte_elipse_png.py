@@ -13,8 +13,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss") # Aquí ya se han filtrado las defectuosas
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
-RUTA_CSV = os.path.join(DIR_CSV, "estadisticas_cielo.csv")
-DIR_SALIDA = os.path.join(REPO_ROOT, "galaxias_elipse")
+RUTA_CSV = os.path.join(DIR_CSV, "estadisticas_espiral.csv")
+DIR_SALIDA = os.path.join(REPO_ROOT, "galaxias_espiral")
 
 if not os.path.exists(DIR_SALIDA):
     os.makedirs(DIR_SALIDA)
@@ -117,7 +117,7 @@ def main():
         files = files[:MAX_ARCHIVOS]
         
     total_files = len(files)
-    procesadas = 0na
+    procesadas = 0
 
     if total_files > 0:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
