@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 ###########################################################################################
 # Rutas absolutas del servidor
-DIR_BASE = '/TFG_F'
+DIR_BASE = '~/TFG_F'
 
 CSV_FISICA = os.path.join(DIR_BASE, 'galaxias_sdss.csv')
 DIR_IMAGENES = os.path.join(DIR_BASE, 'scripts (GitHub)', 'recorte_elipse', 'galaxias_elipse') 
