@@ -12,8 +12,8 @@ REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 CSV_FISICA = os.path.join(DIR_CSV, "galaxias_sdss.csv")
 DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_elipse") 
-DIR_H5 = os.path.join(REPO_ROOT, "h5")
-HDF5_SALIDA = os.path.join(DIR_H5, "dataset_galaxias.h5")
+DIR_H5 = os.path.join(REPO_ROOT, "h5_sin_rgb")
+HDF5_SALIDA = os.path.join(DIR_H5, "dataset_galaxias_sin_rgb.h5")
 
 if not os.path.exists(DIR_H5):
     os.makedirs(DIR_H5)
@@ -49,6 +49,7 @@ def main():
         return
 
     df = pd.DataFrame(validas).reset_index(drop=True)
+    df = df.head(20000)
     N = len(df)
     print(f"Se van a empaquetar {N} galaxias.")
 
