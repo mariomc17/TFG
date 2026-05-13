@@ -10,7 +10,6 @@ import argparse
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List
-from contextlib import nullcontext
 
 from omegaconf import OmegaConf
 
@@ -129,44 +128,6 @@ def parse_args():
 
 
 # =====================================================================
-# Compatibilidad AMP entre versiones de PyTorch.
-# =====================================================================
-def make_grad_scaler(device, enabled: bool):
-    """Devuelve un GradScaler compatible con PyTorch viejo y nuevo."""
-    use_amp = bool(enabled and device.type == "cuda")
-
-    if hasattr(torch, "amp") and hasattr(torch.amp, "GradScaler"):
-        try:
-            return torch.amp.GradScaler("cuda", enabled=use_amp)
-        except TypeError:
-            return torch.amp.GradScaler(enabled=use_amp)
-
-    if hasattr(torch, "cuda") and hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "GradScaler"):
-        return torch.cuda.amp.GradScaler(enabled=use_amp)
-
-    raise RuntimeError("Esta versión de PyTorch no expone GradScaler compatible con AMP.")
-
-
-def autocast_context(device, enabled: bool):
-    """Context manager autocast compatible con PyTorch viejo y nuevo."""
-    use_amp = bool(enabled and device.type == "cuda")
-
-    if not use_amp:
-        return nullcontext()
-
-    if hasattr(torch, "amp") and hasattr(torch.amp, "autocast"):
-        try:
-            return torch.amp.autocast("cuda", dtype=torch.float16, enabled=True)
-        except TypeError:
-            return torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=True)
-
-    if hasattr(torch, "cuda") and hasattr(torch.cuda, "amp") and hasattr(torch.cuda.amp, "autocast"):
-        return torch.cuda.amp.autocast(dtype=torch.float16, enabled=True)
-
-    return nullcontext()
-
-
-# =====================================================================
 # Entrenamiento
 # =====================================================================
 def main():
@@ -238,8 +199,8 @@ def main():
     )
     criterion = nn.MSELoss()
 
-    # AMP compatible con versiones viejas y nuevas de PyTorch
-    scaler = make_grad_scaler(device, cfg.train.amp)
+    # AMP moderno (sin DeprecationWarning en PyTorch >= 2.4)
+    scaler = torch.amp.GradScaler('cuda', enabled=cfg.train.amp)
 
     # ---------- Bucle de entrenamiento ----------
     for epoch in range(cfg.train.epochs):
@@ -262,7 +223,7 @@ def main():
             noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
             optimizer.zero_grad(set_to_none=True)
 
-            with autocast_context(device, cfg.train.amp):
+            with torch.amp.autocast('cuda', dtype=torch.float16, enabled=cfg.train.amp):
                 encoder_hidden_states = projector(phys_vectors)
                 noise_pred = unet(
                     x=noisy_images,

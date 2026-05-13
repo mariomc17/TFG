@@ -1,0 +1,17 @@
+*.h5
+*.rar
+*.zip
+*.png
+runs/
+checkpoints/
+checkpoints_new/
+.cache/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+configs/
+README.md
+Makefile
+*.slurm
+submit_*.sh

@@ -1,0 +1,71 @@
+==== REQUESTED RESOURCES ================
+Job ID: 52871 
+User: elias 
+Node(s): allen.iuii.ua.es 
+CPUs: 8 
+Memory: 65536 MB 
+GPUs: 0 (0) 0
+Gres:
+IDX: 0
+=========================================
+================================================================
+Job:        52871
+Checkpoint: /home/astro/elias/unet_galaxias/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_100.pt
+Config:     configs/gen_examples.yaml
+Host:       allen.iuii.ua.es
+Inicio:     mar 12 may 2026 09:20:50 CEST
+GEN_DIR:    /home/astro/elias/unet_galaxias/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2
+================================================================
+Construyendo/verificando la imagen Docker...
+Sending build context to Docker daemon  3.952GB
+Step 1/10 : FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+ ---> ee0418589bdc
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends         build-essential     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 1d8d2f3faaa4
+Step 3/10 : WORKDIR /app
+ ---> Using cache
+ ---> b214daf411e0
+Step 4/10 : COPY requirements.txt .
+ ---> Using cache
+ ---> cc36492036b2
+Step 5/10 : RUN pip install --no-cache-dir -r requirements.txt
+ ---> Using cache
+ ---> 64e631ffc224
+Step 6/10 : COPY train_diffusion_mi_u_net.py .
+ ---> Using cache
+ ---> bdfbc7a67839
+Step 7/10 : COPY generar_galaxia_mi_u_net.py .
+ ---> Using cache
+ ---> c5b406cf595d
+Step 8/10 : COPY mi_u_net.py .
+ ---> Using cache
+ ---> df210de0fe94
+Step 9/10 : COPY dataset.py .
+ ---> Using cache
+ ---> 6062827c1e98
+Step 10/10 : CMD ["python", "train_diffusion_mi_u_net.py"]
+ ---> Using cache
+ ---> aaca0f1d164b
+Successfully built aaca0f1d164b
+Successfully tagged galaxias-ml:latest
+======================================================================
+Device:        cuda
+Checkpoint:    /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_100.pt
+Pasos DDIM:    50
+# de galaxias: 3
+Output dir:    /app/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2/images
+======================================================================
+Modelo: 128x128, embed_dim=256, time_dim=256
+
+Generando 3 galaxias...
+
+[1/3] 01_eliptica_masiva_inactiva
+  -> Guardado: /app/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2/images/01_eliptica_masiva_inactiva__esc0.20_m0.95_sfr0.10_ea0.10.png
+[2/3] 02_espiral_difusa_activa
+  -> Guardado: /app/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2/images/02_espiral_difusa_activa__esc0.80_m0.30_sfr0.90_ea0.80.png
+[3/3] 03_via_lactea_equilibrada
+  -> Guardado: /app/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2/images/03_via_lactea_equilibrada__esc0.50_m0.50_sfr0.50_ea0.40.png
+
+Listo. 3 imágenes en /app/runs/gen/2026-05-12_08-37-01__job52871__from_2026-05-11_10-09-07__job52692__prueba2/images
+Generación finalizada a mar 12 may 2026 09:21:24 CEST

@@ -1,0 +1,655 @@
+==== REQUESTED RESOURCES ================
+Job ID: 52692 
+User: elias 
+Node(s): lovelace.iuii.ua.es 
+CPUs: 8 
+Memory: 65536 MB 
+GPUs: 5 (0) 0
+Gres:
+IDX: 5
+=========================================
+================================================================
+Job:        52692
+Tag:        prueba2
+Config:     configs/train_baseline.yaml
+Host:       lovelace.iuii.ua.es
+Inicio:     lun 11 may 2026 10:09:15 CEST
+RUN_DIR:    /home/astro/elias/unet_galaxias/runs/train/2026-05-11_10-09-07__job52692__prueba2
+================================================================
+Construyendo la imagen Docker...
+Sending build context to Docker daemon  3.933GB
+Step 1/10 : FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+ ---> ee0418589bdc
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends         build-essential     && rm -rf /var/lib/apt/lists/*
+ ---> Running in c925f2e55392
+Get:1 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:2 http://archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+Get:3 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [7004 kB]
+Get:4 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [61.6 kB]
+Get:5 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3915 kB]
+Get:6 http://archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Get:7 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1294 kB]
+Get:8 http://archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+Get:9 http://archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [266 kB]
+Get:10 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [17.5 MB]
+Get:11 http://archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [164 kB]
+Get:12 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1792 kB]
+Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [4247 kB]
+Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [86.0 kB]
+Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [7251 kB]
+Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1602 kB]
+Get:17 http://archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [35.6 kB]
+Get:18 http://archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [82.8 kB]
+Fetched 45.9 MB in 3s (17.1 MB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  binutils binutils-common binutils-x86-64-linux-gnu bzip2 cpp cpp-11 dpkg-dev
+  g++ g++-11 gcc gcc-11 gcc-11-base gcc-12-base libasan6 libatomic1
+  libbinutils libcc1-0 libctf-nobfd0 libctf0 libdpkg-perl libgcc-11-dev
+  libgcc-s1 libgdbm-compat4 libgdbm6 libgomp1 libisl23 libitm1 liblsan0
+  libmpc3 libmpfr6 libperl5.34 libquadmath0 libstdc++-11-dev libstdc++6
+  libtsan0 libubsan1 lto-disabled-list make patch perl perl-base
+  perl-modules-5.34 xz-utils
+Suggested packages:
+  binutils-doc bzip2-doc cpp-doc gcc-11-locales debian-keyring g++-multilib
+  g++-11-multilib gcc-11-doc gcc-multilib manpages-dev autoconf automake
+  libtool flex bison gdb gcc-doc gcc-11-multilib gnupg git bzr gdbm-l10n
+  libstdc++-11-doc make-doc ed diffutils-doc perl-doc
+  libterm-readline-gnu-perl | libterm-readline-perl-perl
+  libtap-harness-archive-perl
+Recommended packages:
+  fakeroot gnupg libalgorithm-merge-perl libfile-fcntllock-perl
+  liblocale-gettext-perl netbase
+The following NEW packages will be installed:
+  binutils binutils-common binutils-x86-64-linux-gnu build-essential bzip2 cpp
+  cpp-11 dpkg-dev g++ g++-11 gcc gcc-11 gcc-11-base libasan6 libatomic1
+  libbinutils libcc1-0 libctf-nobfd0 libctf0 libdpkg-perl libgcc-11-dev
+  libgdbm-compat4 libgdbm6 libgomp1 libisl23 libitm1 liblsan0 libmpc3 libmpfr6
+  libperl5.34 libquadmath0 libstdc++-11-dev libtsan0 libubsan1
+  lto-disabled-list make patch perl perl-modules-5.34 xz-utils
+The following packages will be upgraded:
+  gcc-12-base libgcc-s1 libstdc++6 perl-base
+4 upgraded, 40 newly installed, 0 to remove and 46 not upgraded.
+Need to get 71.4 MB of archives.
+After this operation, 241 MB of additional disk space will be used.
+Get:1 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 perl-base amd64 5.34.0-3ubuntu1.5 [1761 kB]
+Get:2 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 perl-modules-5.34 all 5.34.0-3ubuntu1.5 [2977 kB]
+Get:3 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgdbm6 amd64 1.23-1 [33.9 kB]
+Get:4 http://archive.ubuntu.com/ubuntu jammy/main amd64 libgdbm-compat4 amd64 1.23-1 [6606 B]
+Get:5 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libperl5.34 amd64 5.34.0-3ubuntu1.5 [4797 kB]
+Get:6 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 perl amd64 5.34.0-3ubuntu1.5 [232 kB]
+Get:7 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-12-base amd64 12.3.0-1ubuntu1~22.04.3 [216 kB]
+Get:8 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++6 amd64 12.3.0-1ubuntu1~22.04.3 [699 kB]
+Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-s1 amd64 12.3.0-1ubuntu1~22.04.3 [53.9 kB]
+Get:10 http://archive.ubuntu.com/ubuntu jammy/main amd64 xz-utils amd64 5.2.5-2ubuntu1 [84.8 kB]
+Get:11 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-common amd64 2.38-4ubuntu2.12 [223 kB]
+Get:12 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libbinutils amd64 2.38-4ubuntu2.12 [663 kB]
+Get:13 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf-nobfd0 amd64 2.38-4ubuntu2.12 [108 kB]
+Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libctf0 amd64 2.38-4ubuntu2.12 [103 kB]
+Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils-x86-64-linux-gnu amd64 2.38-4ubuntu2.12 [2324 kB]
+Get:16 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 binutils amd64 2.38-4ubuntu2.12 [3184 B]
+Get:17 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11-base amd64 11.4.0-1ubuntu1~22.04.3 [216 kB]
+Get:18 http://archive.ubuntu.com/ubuntu jammy/main amd64 libisl23 amd64 0.24-2build1 [727 kB]
+Get:19 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmpfr6 amd64 4.1.0-3build3 [1425 kB]
+Get:20 http://archive.ubuntu.com/ubuntu jammy/main amd64 libmpc3 amd64 1.2.1-2build1 [46.9 kB]
+Get:21 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 cpp-11 amd64 11.4.0-1ubuntu1~22.04.3 [10.0 MB]
+Get:22 http://archive.ubuntu.com/ubuntu jammy/main amd64 cpp amd64 4:11.2.0-1ubuntu1 [27.7 kB]
+Get:23 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcc1-0 amd64 12.3.0-1ubuntu1~22.04.3 [48.3 kB]
+Get:24 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgomp1 amd64 12.3.0-1ubuntu1~22.04.3 [127 kB]
+Get:25 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libitm1 amd64 12.3.0-1ubuntu1~22.04.3 [30.2 kB]
+Get:26 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libatomic1 amd64 12.3.0-1ubuntu1~22.04.3 [10.5 kB]
+Get:27 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasan6 amd64 11.4.0-1ubuntu1~22.04.3 [2283 kB]
+Get:28 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 liblsan0 amd64 12.3.0-1ubuntu1~22.04.3 [1069 kB]
+Get:29 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtsan0 amd64 11.4.0-1ubuntu1~22.04.3 [2260 kB]
+Get:30 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libubsan1 amd64 12.3.0-1ubuntu1~22.04.3 [976 kB]
+Get:31 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libquadmath0 amd64 12.3.0-1ubuntu1~22.04.3 [154 kB]
+Get:32 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2517 kB]
+Get:33 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11 amd64 11.4.0-1ubuntu1~22.04.3 [20.1 MB]
+Get:34 http://archive.ubuntu.com/ubuntu jammy/main amd64 gcc amd64 4:11.2.0-1ubuntu1 [5112 B]
+Get:35 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2101 kB]
+Get:36 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 g++-11 amd64 11.4.0-1ubuntu1~22.04.3 [11.4 MB]
+Get:37 http://archive.ubuntu.com/ubuntu jammy/main amd64 g++ amd64 4:11.2.0-1ubuntu1 [1412 B]
+Get:38 http://archive.ubuntu.com/ubuntu jammy/main amd64 make amd64 4.3-4.1build1 [180 kB]
+Get:39 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdpkg-perl all 1.21.1ubuntu2.6 [237 kB]
+Get:40 http://archive.ubuntu.com/ubuntu jammy/main amd64 bzip2 amd64 1.0.8-5build1 [34.8 kB]
+Get:41 http://archive.ubuntu.com/ubuntu jammy/main amd64 patch amd64 2.7.6-7build2 [109 kB]
+Get:42 http://archive.ubuntu.com/ubuntu jammy/main amd64 lto-disabled-list all 24 [12.5 kB]
+Get:43 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 dpkg-dev all 1.21.1ubuntu2.6 [922 kB]
+Get:44 http://archive.ubuntu.com/ubuntu jammy/main amd64 build-essential amd64 12.9ubuntu3 [4744 B]
+[91mdebconf: delaying package configuration, since apt-utils is not installed
+[0mFetched 71.4 MB in 2s (41.6 MB/s)
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6643 files and directories currently installed.)
+Preparing to unpack .../perl-base_5.34.0-3ubuntu1.5_amd64.deb ...
+Unpacking perl-base (5.34.0-3ubuntu1.5) over (5.34.0-3ubuntu1.3) ...
+Setting up perl-base (5.34.0-3ubuntu1.5) ...
+Selecting previously unselected package perl-modules-5.34.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6643 files and directories currently installed.)
+Preparing to unpack .../0-perl-modules-5.34_5.34.0-3ubuntu1.5_all.deb ...
+Unpacking perl-modules-5.34 (5.34.0-3ubuntu1.5) ...
+Selecting previously unselected package libgdbm6:amd64.
+Preparing to unpack .../1-libgdbm6_1.23-1_amd64.deb ...
+Unpacking libgdbm6:amd64 (1.23-1) ...
+Selecting previously unselected package libgdbm-compat4:amd64.
+Preparing to unpack .../2-libgdbm-compat4_1.23-1_amd64.deb ...
+Unpacking libgdbm-compat4:amd64 (1.23-1) ...
+Selecting previously unselected package libperl5.34:amd64.
+Preparing to unpack .../3-libperl5.34_5.34.0-3ubuntu1.5_amd64.deb ...
+Unpacking libperl5.34:amd64 (5.34.0-3ubuntu1.5) ...
+Selecting previously unselected package perl.
+Preparing to unpack .../4-perl_5.34.0-3ubuntu1.5_amd64.deb ...
+Unpacking perl (5.34.0-3ubuntu1.5) ...
+Preparing to unpack .../5-gcc-12-base_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-12-base:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04) ...
+Setting up gcc-12-base:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 8631 files and directories currently installed.)
+Preparing to unpack .../libstdc++6_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libstdc++6:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04) ...
+Setting up libstdc++6:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 8631 files and directories currently installed.)
+Preparing to unpack .../libgcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgcc-s1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04) ...
+Setting up libgcc-s1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package xz-utils.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 8631 files and directories currently installed.)
+Preparing to unpack .../00-xz-utils_5.2.5-2ubuntu1_amd64.deb ...
+Unpacking xz-utils (5.2.5-2ubuntu1) ...
+Selecting previously unselected package binutils-common:amd64.
+Preparing to unpack .../01-binutils-common_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking binutils-common:amd64 (2.38-4ubuntu2.12) ...
+Selecting previously unselected package libbinutils:amd64.
+Preparing to unpack .../02-libbinutils_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking libbinutils:amd64 (2.38-4ubuntu2.12) ...
+Selecting previously unselected package libctf-nobfd0:amd64.
+Preparing to unpack .../03-libctf-nobfd0_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking libctf-nobfd0:amd64 (2.38-4ubuntu2.12) ...
+Selecting previously unselected package libctf0:amd64.
+Preparing to unpack .../04-libctf0_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking libctf0:amd64 (2.38-4ubuntu2.12) ...
+Selecting previously unselected package binutils-x86-64-linux-gnu.
+Preparing to unpack .../05-binutils-x86-64-linux-gnu_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking binutils-x86-64-linux-gnu (2.38-4ubuntu2.12) ...
+Selecting previously unselected package binutils.
+Preparing to unpack .../06-binutils_2.38-4ubuntu2.12_amd64.deb ...
+Unpacking binutils (2.38-4ubuntu2.12) ...
+Selecting previously unselected package gcc-11-base:amd64.
+Preparing to unpack .../07-gcc-11-base_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libisl23:amd64.
+Preparing to unpack .../08-libisl23_0.24-2build1_amd64.deb ...
+Unpacking libisl23:amd64 (0.24-2build1) ...
+Selecting previously unselected package libmpfr6:amd64.
+Preparing to unpack .../09-libmpfr6_4.1.0-3build3_amd64.deb ...
+Unpacking libmpfr6:amd64 (4.1.0-3build3) ...
+Selecting previously unselected package libmpc3:amd64.
+Preparing to unpack .../10-libmpc3_1.2.1-2build1_amd64.deb ...
+Unpacking libmpc3:amd64 (1.2.1-2build1) ...
+Selecting previously unselected package cpp-11.
+Preparing to unpack .../11-cpp-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking cpp-11 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package cpp.
+Preparing to unpack .../12-cpp_4%3a11.2.0-1ubuntu1_amd64.deb ...
+Unpacking cpp (4:11.2.0-1ubuntu1) ...
+Selecting previously unselected package libcc1-0:amd64.
+Preparing to unpack .../13-libcc1-0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libgomp1:amd64.
+Preparing to unpack .../14-libgomp1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libitm1:amd64.
+Preparing to unpack .../15-libitm1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libatomic1:amd64.
+Preparing to unpack .../16-libatomic1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libasan6:amd64.
+Preparing to unpack .../17-libasan6_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package liblsan0:amd64.
+Preparing to unpack .../18-liblsan0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libtsan0:amd64.
+Preparing to unpack .../19-libtsan0_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libubsan1:amd64.
+Preparing to unpack .../20-libubsan1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libquadmath0:amd64.
+Preparing to unpack .../21-libquadmath0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libgcc-11-dev:amd64.
+Preparing to unpack .../22-libgcc-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package gcc-11.
+Preparing to unpack .../23-gcc-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-11 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package gcc.
+Preparing to unpack .../24-gcc_4%3a11.2.0-1ubuntu1_amd64.deb ...
+Unpacking gcc (4:11.2.0-1ubuntu1) ...
+Selecting previously unselected package libstdc++-11-dev:amd64.
+Preparing to unpack .../25-libstdc++-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package g++-11.
+Preparing to unpack .../26-g++-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking g++-11 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package g++.
+Preparing to unpack .../27-g++_4%3a11.2.0-1ubuntu1_amd64.deb ...
+Unpacking g++ (4:11.2.0-1ubuntu1) ...
+Selecting previously unselected package make.
+Preparing to unpack .../28-make_4.3-4.1build1_amd64.deb ...
+Unpacking make (4.3-4.1build1) ...
+Selecting previously unselected package libdpkg-perl.
+Preparing to unpack .../29-libdpkg-perl_1.21.1ubuntu2.6_all.deb ...
+Unpacking libdpkg-perl (1.21.1ubuntu2.6) ...
+Selecting previously unselected package bzip2.
+Preparing to unpack .../30-bzip2_1.0.8-5build1_amd64.deb ...
+Unpacking bzip2 (1.0.8-5build1) ...
+Selecting previously unselected package patch.
+Preparing to unpack .../31-patch_2.7.6-7build2_amd64.deb ...
+Unpacking patch (2.7.6-7build2) ...
+Selecting previously unselected package lto-disabled-list.
+Preparing to unpack .../32-lto-disabled-list_24_all.deb ...
+Unpacking lto-disabled-list (24) ...
+Selecting previously unselected package dpkg-dev.
+Preparing to unpack .../33-dpkg-dev_1.21.1ubuntu2.6_all.deb ...
+Unpacking dpkg-dev (1.21.1ubuntu2.6) ...
+Selecting previously unselected package build-essential.
+Preparing to unpack .../34-build-essential_12.9ubuntu3_amd64.deb ...
+Unpacking build-essential (12.9ubuntu3) ...
+Setting up gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up lto-disabled-list (24) ...
+Setting up binutils-common:amd64 (2.38-4ubuntu2.12) ...
+Setting up libctf-nobfd0:amd64 (2.38-4ubuntu2.12) ...
+Setting up libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up perl-modules-5.34 (5.34.0-3ubuntu1.5) ...
+Setting up bzip2 (1.0.8-5build1) ...
+Setting up libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up make (4.3-4.1build1) ...
+Setting up libmpfr6:amd64 (4.1.0-3build3) ...
+Setting up xz-utils (5.2.5-2ubuntu1) ...
+update-alternatives: using /usr/bin/xz to provide /usr/bin/lzma (lzma) in auto mode
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzma.1.gz because associated file /usr/share/man/man1/xz.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/unlzma.1.gz because associated file /usr/share/man/man1/unxz.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzcat.1.gz because associated file /usr/share/man/man1/xzcat.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzmore.1.gz because associated file /usr/share/man/man1/xzmore.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzless.1.gz because associated file /usr/share/man/man1/xzless.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzdiff.1.gz because associated file /usr/share/man/man1/xzdiff.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzcmp.1.gz because associated file /usr/share/man/man1/xzcmp.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzgrep.1.gz because associated file /usr/share/man/man1/xzgrep.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzegrep.1.gz because associated file /usr/share/man/man1/xzegrep.1.gz (of link group lzma) doesn't exist
+update-alternatives: warning: skip creation of /usr/share/man/man1/lzfgrep.1.gz because associated file /usr/share/man/man1/xzfgrep.1.gz (of link group lzma) doesn't exist
+Setting up libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libmpc3:amd64 (1.2.1-2build1) ...
+Setting up libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up patch (2.7.6-7build2) ...
+Setting up libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libbinutils:amd64 (2.38-4ubuntu2.12) ...
+Setting up libisl23:amd64 (0.24-2build1) ...
+Setting up libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libgdbm6:amd64 (1.23-1) ...
+Setting up libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up libctf0:amd64 (2.38-4ubuntu2.12) ...
+Setting up cpp-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up libgdbm-compat4:amd64 (1.23-1) ...
+Setting up libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up cpp (4:11.2.0-1ubuntu1) ...
+Setting up binutils-x86-64-linux-gnu (2.38-4ubuntu2.12) ...
+Setting up libperl5.34:amd64 (5.34.0-3ubuntu1.5) ...
+Setting up binutils (2.38-4ubuntu2.12) ...
+Setting up perl (5.34.0-3ubuntu1.5) ...
+Setting up libdpkg-perl (1.21.1ubuntu2.6) ...
+Setting up libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up gcc-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up g++-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up gcc (4:11.2.0-1ubuntu1) ...
+Setting up dpkg-dev (1.21.1ubuntu2.6) ...
+Setting up g++ (4:11.2.0-1ubuntu1) ...
+update-alternatives: using /usr/bin/g++ to provide /usr/bin/c++ (c++) in auto mode
+update-alternatives: warning: skip creation of /usr/share/man/man1/c++.1.gz because associated file /usr/share/man/man1/g++.1.gz (of link group c++) doesn't exist
+Setting up build-essential (12.9ubuntu3) ...
+Processing triggers for libc-bin (2.35-0ubuntu3.6) ...
+ ---> Removed intermediate container c925f2e55392
+ ---> b6add2d41db2
+Step 3/10 : WORKDIR /app
+ ---> Running in 2294b8fd3d93
+ ---> Removed intermediate container 2294b8fd3d93
+ ---> cd71e530fe79
+Step 4/10 : COPY requirements.txt .
+ ---> 05cc26659649
+Step 5/10 : RUN pip install --no-cache-dir -r requirements.txt
+ ---> Running in 4f843f10435e
+Collecting diffusers==0.29.2 (from -r requirements.txt (line 1))
+  Downloading diffusers-0.29.2-py3-none-any.whl.metadata (19 kB)
+Collecting h5py==3.10.0 (from -r requirements.txt (line 2))
+  Downloading h5py-3.10.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.5 kB)
+Collecting pandas==2.2.1 (from -r requirements.txt (line 3))
+  Downloading pandas-2.2.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (19 kB)
+Collecting numpy==1.26.4 (from -r requirements.txt (line 4))
+  Downloading numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 61.0/61.0 kB 6.3 MB/s eta 0:00:00
+Collecting Pillow==10.2.0 (from -r requirements.txt (line 5))
+  Downloading pillow-10.2.0-cp310-cp310-manylinux_2_28_x86_64.whl.metadata (9.7 kB)
+Collecting tqdm==4.66.2 (from -r requirements.txt (line 6))
+  Downloading tqdm-4.66.2-py3-none-any.whl.metadata (57 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.6/57.6 kB 120.2 MB/s eta 0:00:00
+Collecting matplotlib==3.8.3 (from -r requirements.txt (line 7))
+  Downloading matplotlib-3.8.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.8 kB)
+Collecting omegaconf==2.3.0 (from -r requirements.txt (line 8))
+  Downloading omegaconf-2.3.0-py3-none-any.whl.metadata (3.9 kB)
+Collecting importlib-metadata (from diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading importlib_metadata-9.0.0-py3-none-any.whl.metadata (4.5 kB)
+Requirement already satisfied: filelock in /opt/conda/lib/python3.10/site-packages (from diffusers==0.29.2->-r requirements.txt (line 1)) (3.13.1)
+Collecting huggingface-hub>=0.23.2 (from diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading huggingface_hub-1.14.0-py3-none-any.whl.metadata (14 kB)
+Collecting regex!=2019.12.17 (from diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading regex-2026.5.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (40 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 40.4/40.4 kB 136.0 MB/s eta 0:00:00
+Requirement already satisfied: requests in /opt/conda/lib/python3.10/site-packages (from diffusers==0.29.2->-r requirements.txt (line 1)) (2.31.0)
+Collecting safetensors>=0.3.1 (from diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading safetensors-0.7.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.1 kB)
+Collecting python-dateutil>=2.8.2 (from pandas==2.2.1->-r requirements.txt (line 3))
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Requirement already satisfied: pytz>=2020.1 in /opt/conda/lib/python3.10/site-packages (from pandas==2.2.1->-r requirements.txt (line 3)) (2023.3.post1)
+Collecting tzdata>=2022.7 (from pandas==2.2.1->-r requirements.txt (line 3))
+  Downloading tzdata-2026.2-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting contourpy>=1.0.1 (from matplotlib==3.8.3->-r requirements.txt (line 7))
+  Downloading contourpy-1.3.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.5 kB)
+Collecting cycler>=0.10 (from matplotlib==3.8.3->-r requirements.txt (line 7))
+  Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib==3.8.3->-r requirements.txt (line 7))
+  Downloading fonttools-4.62.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (117 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.5/117.5 kB 44.1 MB/s eta 0:00:00
+Collecting kiwisolver>=1.3.1 (from matplotlib==3.8.3->-r requirements.txt (line 7))
+  Downloading kiwisolver-1.5.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl.metadata (5.1 kB)
+Requirement already satisfied: packaging>=20.0 in /opt/conda/lib/python3.10/site-packages (from matplotlib==3.8.3->-r requirements.txt (line 7)) (23.1)
+Collecting pyparsing>=2.3.1 (from matplotlib==3.8.3->-r requirements.txt (line 7))
+  Downloading pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+Collecting antlr4-python3-runtime==4.9.* (from omegaconf==2.3.0->-r requirements.txt (line 8))
+  Downloading antlr4-python3-runtime-4.9.3.tar.gz (117 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.0/117.0 kB 138.9 MB/s eta 0:00:00
+  Preparing metadata (setup.py): started
+  Preparing metadata (setup.py): finished with status 'done'
+Requirement already satisfied: PyYAML>=5.1.0 in /opt/conda/lib/python3.10/site-packages (from omegaconf==2.3.0->-r requirements.txt (line 8)) (6.0.1)
+Requirement already satisfied: fsspec>=2023.5.0 in /opt/conda/lib/python3.10/site-packages (from huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1)) (2023.12.2)
+Collecting hf-xet<2.0.0,>=1.4.3 (from huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading hf_xet-1.5.0-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+Collecting httpx<1,>=0.23.0 (from huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Collecting typer>=0.20.0 (from huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading typer-0.25.1-py3-none-any.whl.metadata (15 kB)
+Requirement already satisfied: typing-extensions>=4.1.0 in /opt/conda/lib/python3.10/site-packages (from huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1)) (4.9.0)
+Requirement already satisfied: six>=1.5 in /opt/conda/lib/python3.10/site-packages (from python-dateutil>=2.8.2->pandas==2.2.1->-r requirements.txt (line 3)) (1.16.0)
+Collecting zipp>=3.20 (from importlib-metadata->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading zipp-3.23.1-py3-none-any.whl.metadata (3.6 kB)
+Requirement already satisfied: charset-normalizer<4,>=2 in /opt/conda/lib/python3.10/site-packages (from requests->diffusers==0.29.2->-r requirements.txt (line 1)) (2.0.4)
+Requirement already satisfied: idna<4,>=2.5 in /opt/conda/lib/python3.10/site-packages (from requests->diffusers==0.29.2->-r requirements.txt (line 1)) (3.4)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/conda/lib/python3.10/site-packages (from requests->diffusers==0.29.2->-r requirements.txt (line 1)) (1.26.18)
+Requirement already satisfied: certifi>=2017.4.17 in /opt/conda/lib/python3.10/site-packages (from requests->diffusers==0.29.2->-r requirements.txt (line 1)) (2023.11.17)
+Collecting anyio (from httpx<1,>=0.23.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading anyio-4.13.0-py3-none-any.whl.metadata (4.5 kB)
+Collecting httpcore==1.* (from httpx<1,>=0.23.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Collecting h11>=0.16 (from httpcore==1.*->httpx<1,>=0.23.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting click>=8.2.1 (from typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading click-8.3.3-py3-none-any.whl.metadata (2.6 kB)
+Collecting shellingham>=1.3.0 (from typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Collecting rich>=13.8.0 (from typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting annotated-doc>=0.0.2 (from typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+Collecting markdown-it-py>=2.2.0 (from rich>=13.8.0->typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /opt/conda/lib/python3.10/site-packages (from rich>=13.8.0->typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1)) (2.15.1)
+Requirement already satisfied: exceptiongroup>=1.0.2 in /opt/conda/lib/python3.10/site-packages (from anyio->httpx<1,>=0.23.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1)) (1.2.0)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=13.8.0->typer>=0.20.0->huggingface-hub>=0.23.2->diffusers==0.29.2->-r requirements.txt (line 1))
+  Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Downloading diffusers-0.29.2-py3-none-any.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 2.6 MB/s eta 0:00:00
+Downloading h5py-3.10.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.8/4.8 MB 92.9 MB/s eta 0:00:00
+Downloading pandas-2.2.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (13.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.0/13.0 MB 137.3 MB/s eta 0:00:00
+Downloading numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (18.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 18.2/18.2 MB 102.4 MB/s eta 0:00:00
+Downloading pillow-10.2.0-cp310-cp310-manylinux_2_28_x86_64.whl (4.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 117.3 MB/s eta 0:00:00
+Downloading tqdm-4.66.2-py3-none-any.whl (78 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.3/78.3 kB 157.2 MB/s eta 0:00:00
+Downloading matplotlib-3.8.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (11.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.6/11.6 MB 113.7 MB/s eta 0:00:00
+Downloading omegaconf-2.3.0-py3-none-any.whl (79 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 79.5/79.5 kB 143.0 MB/s eta 0:00:00
+Downloading contourpy-1.3.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (325 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 325.0/325.0 kB 144.1 MB/s eta 0:00:00
+Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Downloading fonttools-4.62.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 115.0 MB/s eta 0:00:00
+Downloading huggingface_hub-1.14.0-py3-none-any.whl (661 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 661.5/661.5 kB 130.0 MB/s eta 0:00:00
+Downloading kiwisolver-1.5.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl (1.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 120.0 MB/s eta 0:00:00
+Downloading pyparsing-3.3.2-py3-none-any.whl (122 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 122.8/122.8 kB 157.6 MB/s eta 0:00:00
+Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 145.1 MB/s eta 0:00:00
+Downloading regex-2026.5.9-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (794 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 794.1/794.1 kB 127.9 MB/s eta 0:00:00
+Downloading safetensors-0.7.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (507 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 507.2/507.2 kB 125.3 MB/s eta 0:00:00
+Downloading tzdata-2026.2-py2.py3-none-any.whl (349 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 349.3/349.3 kB 142.5 MB/s eta 0:00:00
+Downloading importlib_metadata-9.0.0-py3-none-any.whl (27 kB)
+Downloading hf_xet-1.5.0-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 116.7 MB/s eta 0:00:00
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 153.5 MB/s eta 0:00:00
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 155.6 MB/s eta 0:00:00
+Downloading typer-0.25.1-py3-none-any.whl (58 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 58.4/58.4 kB 156.6 MB/s eta 0:00:00
+Downloading zipp-3.23.1-py3-none-any.whl (10 kB)
+Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+Downloading click-8.3.3-py3-none-any.whl (110 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 110.5/110.5 kB 117.2 MB/s eta 0:00:00
+Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 310.7/310.7 kB 137.3 MB/s eta 0:00:00
+Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Downloading anyio-4.13.0-py3-none-any.whl (114 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.4/114.4 kB 152.4 MB/s eta 0:00:00
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.7/91.7 kB 152.5 MB/s eta 0:00:00
+Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Building wheels for collected packages: antlr4-python3-runtime
+  Building wheel for antlr4-python3-runtime (setup.py): started
+  Building wheel for antlr4-python3-runtime (setup.py): finished with status 'done'
+  Created wheel for antlr4-python3-runtime: filename=antlr4_python3_runtime-4.9.3-py3-none-any.whl size=144554 sha256=72b12bbb2093663102068593e5d872a2577898a6ba7a15f07319326e9619bca9
+  Stored in directory: /tmp/pip-ephem-wheel-cache-d12c_pto/wheels/12/93/dd/1f6a127edc45659556564c5730f6d4e300888f4bca2d4c5a88
+Successfully built antlr4-python3-runtime
+Installing collected packages: antlr4-python3-runtime, zipp, tzdata, tqdm, shellingham, safetensors, regex, python-dateutil, pyparsing, Pillow, omegaconf, numpy, mdurl, kiwisolver, hf-xet, h11, fonttools, cycler, click, anyio, annotated-doc, pandas, markdown-it-py, importlib-metadata, httpcore, h5py, contourpy, rich, matplotlib, httpx, typer, huggingface-hub, diffusers
+  Attempting uninstall: tqdm
+    Found existing installation: tqdm 4.65.0
+    Uninstalling tqdm-4.65.0:
+      Successfully uninstalled tqdm-4.65.0
+  Attempting uninstall: Pillow
+    Found existing installation: Pillow 10.0.1
+    Uninstalling Pillow-10.0.1:
+      Successfully uninstalled Pillow-10.0.1
+  Attempting uninstall: numpy
+    Found existing installation: numpy 1.26.3
+    Uninstalling numpy-1.26.3:
+      Successfully uninstalled numpy-1.26.3
+  Attempting uninstall: click
+    Found existing installation: click 8.1.7
+    Uninstalling click-8.1.7:
+      Successfully uninstalled click-8.1.7
+Successfully installed Pillow-10.2.0 annotated-doc-0.0.4 antlr4-python3-runtime-4.9.3 anyio-4.13.0 click-8.3.3 contourpy-1.3.2 cycler-0.12.1 diffusers-0.29.2 fonttools-4.62.1 h11-0.16.0 h5py-3.10.0 hf-xet-1.5.0 httpcore-1.0.9 httpx-0.28.1 huggingface-hub-1.14.0 importlib-metadata-9.0.0 kiwisolver-1.5.0 markdown-it-py-4.2.0 matplotlib-3.8.3 mdurl-0.1.2 numpy-1.26.4 omegaconf-2.3.0 pandas-2.2.1 pyparsing-3.3.2 python-dateutil-2.9.0.post0 regex-2026.5.9 rich-15.0.0 safetensors-0.7.0 shellingham-1.5.4 tqdm-4.66.2 typer-0.25.1 tzdata-2026.2 zipp-3.23.1
+[91mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+[0m ---> Removed intermediate container 4f843f10435e
+ ---> f2958a73eed7
+Step 6/10 : COPY train_diffusion_mi_u_net.py .
+ ---> f9e7a691d8cb
+Step 7/10 : COPY generar_galaxia_mi_u_net.py .
+ ---> 9c6490afe196
+Step 8/10 : COPY mi_u_net.py .
+ ---> ce1b35df79a3
+Step 9/10 : COPY dataset.py .
+ ---> 170e1668608b
+Step 10/10 : CMD ["python", "train_diffusion_mi_u_net.py"]
+ ---> Running in 6d1129663f87
+ ---> Removed intermediate container 6d1129663f87
+ ---> 274aadc2409d
+Successfully built 274aadc2409d
+Successfully tagged galaxias-ml:latest
+Lanzando el entrenamiento...
+======================================================================
+RUN_DIR:    /app/runs/train/2026-05-11_10-09-07__job52692__prueba2
+Config:     configs/train_baseline.yaml
+Device:     cuda
+Configuración final tras merges:
+data:
+  hdf5_path: dataset_galaxias_sin_rgb.h5
+  img_size: 128
+  variables:
+  - ESCALA_KPC_PX
+  - LOG_MS
+  - SFR
+  - EA
+  num_workers: 4
+train:
+  batch_size: 32
+  epochs: 100
+  lr: 0.0002
+  save_every: 10
+  amp: true
+  compile: true
+model:
+  n_channels: 3
+  n_classes: 3
+  embed_dim: 256
+  time_dim: 256
+diffusion:
+  num_train_timesteps: 1000
+
+======================================================================
+Dataset HDF5 enganchado: 20000 galaxias listas para procesar.
+Compilando el modelo con torch.compile()...
+Época 1 terminada | MSE Loss Medio: 0.0655
+Época 2 terminada | MSE Loss Medio: 0.0202
+Época 3 terminada | MSE Loss Medio: 0.0162
+Época 4 terminada | MSE Loss Medio: 0.0139
+Época 5 terminada | MSE Loss Medio: 0.0129
+Época 6 terminada | MSE Loss Medio: 0.0107
+Época 7 terminada | MSE Loss Medio: 0.0097
+Época 8 terminada | MSE Loss Medio: 0.0092
+Época 9 terminada | MSE Loss Medio: 0.0083
+Época 10 terminada | MSE Loss Medio: 0.0075
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_010.pt
+Época 11 terminada | MSE Loss Medio: 0.0072
+Época 12 terminada | MSE Loss Medio: 0.0062
+Época 13 terminada | MSE Loss Medio: 0.0064
+Época 14 terminada | MSE Loss Medio: 0.0059
+Época 15 terminada | MSE Loss Medio: 0.0056
+Época 16 terminada | MSE Loss Medio: 0.0052
+Época 17 terminada | MSE Loss Medio: 0.0050
+Época 18 terminada | MSE Loss Medio: 0.0049
+Época 19 terminada | MSE Loss Medio: 0.0046
+Época 20 terminada | MSE Loss Medio: 0.0045
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_020.pt
+Época 21 terminada | MSE Loss Medio: 0.0044
+Época 22 terminada | MSE Loss Medio: 0.0043
+Época 23 terminada | MSE Loss Medio: 0.0040
+Época 24 terminada | MSE Loss Medio: 0.0041
+Época 25 terminada | MSE Loss Medio: 0.0041
+Época 26 terminada | MSE Loss Medio: 0.0039
+Época 27 terminada | MSE Loss Medio: 0.0039
+Época 28 terminada | MSE Loss Medio: 0.0035
+Época 29 terminada | MSE Loss Medio: 0.0036
+Época 30 terminada | MSE Loss Medio: 0.0036
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_030.pt
+Época 31 terminada | MSE Loss Medio: 0.0037
+Época 32 terminada | MSE Loss Medio: 0.0034
+Época 33 terminada | MSE Loss Medio: 0.0035
+Época 34 terminada | MSE Loss Medio: 0.0032
+Época 35 terminada | MSE Loss Medio: 0.0033
+Época 36 terminada | MSE Loss Medio: 0.0035
+Época 37 terminada | MSE Loss Medio: 0.0033
+Época 38 terminada | MSE Loss Medio: 0.0033
+Época 39 terminada | MSE Loss Medio: 0.0030
+Época 40 terminada | MSE Loss Medio: 0.0032
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_040.pt
+Época 41 terminada | MSE Loss Medio: 0.0030
+Época 42 terminada | MSE Loss Medio: 0.0030
+Época 43 terminada | MSE Loss Medio: 0.0028
+Época 44 terminada | MSE Loss Medio: 0.0029
+Época 45 terminada | MSE Loss Medio: 0.0031
+Época 46 terminada | MSE Loss Medio: 0.0029
+Época 47 terminada | MSE Loss Medio: 0.0032
+Época 48 terminada | MSE Loss Medio: 0.0030
+Época 49 terminada | MSE Loss Medio: 0.0029
+Época 50 terminada | MSE Loss Medio: 0.0033
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_050.pt
+Época 51 terminada | MSE Loss Medio: 0.0028
+Época 52 terminada | MSE Loss Medio: 0.0027
+Época 53 terminada | MSE Loss Medio: 0.0032
+Época 54 terminada | MSE Loss Medio: 0.0026
+Época 55 terminada | MSE Loss Medio: 0.0029
+Época 56 terminada | MSE Loss Medio: 0.0028
+Época 57 terminada | MSE Loss Medio: 0.0027
+Época 58 terminada | MSE Loss Medio: 0.0026
+Época 59 terminada | MSE Loss Medio: 0.0027
+Época 60 terminada | MSE Loss Medio: 0.0027
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_060.pt
+Época 61 terminada | MSE Loss Medio: 0.0026
+Época 62 terminada | MSE Loss Medio: 0.0027
+Época 63 terminada | MSE Loss Medio: 0.0027
+Época 64 terminada | MSE Loss Medio: 0.0027
+Época 65 terminada | MSE Loss Medio: 0.0025
+Época 66 terminada | MSE Loss Medio: 0.0027
+Época 67 terminada | MSE Loss Medio: 0.0026
+Época 68 terminada | MSE Loss Medio: 0.0027
+Época 69 terminada | MSE Loss Medio: 0.0025
+Época 70 terminada | MSE Loss Medio: 0.0026
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_070.pt
+Época 71 terminada | MSE Loss Medio: 0.0024
+Época 72 terminada | MSE Loss Medio: 0.0026
+Época 73 terminada | MSE Loss Medio: 0.0025
+Época 74 terminada | MSE Loss Medio: 0.0024
+Época 75 terminada | MSE Loss Medio: 0.0028
+Época 76 terminada | MSE Loss Medio: 0.0026
+Época 77 terminada | MSE Loss Medio: 0.0026
+Época 78 terminada | MSE Loss Medio: 0.0025
+Época 79 terminada | MSE Loss Medio: 0.0026
+Época 80 terminada | MSE Loss Medio: 0.0023
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_080.pt
+Época 81 terminada | MSE Loss Medio: 0.0024
+Época 82 terminada | MSE Loss Medio: 0.0027
+Época 83 terminada | MSE Loss Medio: 0.0024
+Época 84 terminada | MSE Loss Medio: 0.0023
+Época 85 terminada | MSE Loss Medio: 0.0023
+Época 86 terminada | MSE Loss Medio: 0.0027
+Época 87 terminada | MSE Loss Medio: 0.0024
+Época 88 terminada | MSE Loss Medio: 0.0025
+Época 89 terminada | MSE Loss Medio: 0.0025
+Época 90 terminada | MSE Loss Medio: 0.0024
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_090.pt
+Época 91 terminada | MSE Loss Medio: 0.0025
+Época 92 terminada | MSE Loss Medio: 0.0023
+Época 93 terminada | MSE Loss Medio: 0.0024
+Época 94 terminada | MSE Loss Medio: 0.0024
+Época 95 terminada | MSE Loss Medio: 0.0024
+Época 96 terminada | MSE Loss Medio: 0.0023
+Época 97 terminada | MSE Loss Medio: 0.0024
+Época 98 terminada | MSE Loss Medio: 0.0025
+Época 99 terminada | MSE Loss Medio: 0.0024
+Época 100 terminada | MSE Loss Medio: 0.0025
+  -> Checkpoint guardado: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_100.pt
+
+Entrenamiento completado. Resultados en: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2
+Trabajo finalizado a las lun 11 may 2026 23:09:36 CEST

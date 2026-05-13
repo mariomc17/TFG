@@ -1,0 +1,26 @@
+# configs/gen_examples.yaml
+# Galaxias a generar en un job. Cada entrada produce un PNG.
+# 'checkpoint: null' deja que submit_gen.sh autodescubra el último.
+# Todos los valores físicos son normalizados [0.0 - 1.0].
+
+checkpoint: null
+inference_steps: 50
+
+galaxies:
+  - etiqueta: 01_eliptica_masiva_inactiva
+    escala: 0.2
+    masa: 0.95
+    sfr: 0.10
+    ea: 0.10
+
+  - etiqueta: 02_espiral_difusa_activa
+    escala: 0.8
+    masa: 0.30
+    sfr: 0.90
+    ea: 0.80
+
+  - etiqueta: 03_via_lactea_equilibrada
+    escala: 0.5
+    masa: 0.50
+    sfr: 0.50
+    ea: 0.40

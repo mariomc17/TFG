@@ -1,0 +1,19 @@
+checkpoint: /app/runs/train/2026-05-11_10-09-07__job52692__prueba2/checkpoints/modelo_epoca_100.pt
+img_size: 128
+inference_steps: 50
+galaxies:
+- etiqueta: 01_eliptica_masiva_inactiva
+  escala: 0.2
+  masa: 0.95
+  sfr: 0.1
+  ea: 0.1
+- etiqueta: 02_espiral_difusa_activa
+  escala: 0.8
+  masa: 0.3
+  sfr: 0.9
+  ea: 0.8
+- etiqueta: 03_via_lactea_equilibrada
+  escala: 0.5
+  masa: 0.5
+  sfr: 0.5
+  ea: 0.4

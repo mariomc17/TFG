@@ -1,0 +1,85 @@
+==== REQUESTED RESOURCES ================
+Job ID: 52687 
+User: elias 
+Node(s): allen.iuii.ua.es 
+CPUs: 8 
+Memory: 65536 MB 
+GPUs: 1 (0) 0
+Gres:
+IDX: 1
+=========================================
+================================================================
+Job:        52687
+Tag:        prueba1
+Config:     configs/train_baseline.yaml
+Host:       allen.iuii.ua.es
+Inicio:     lun 11 may 2026 09:59:28 CEST
+RUN_DIR:    /home/astro/elias/unet_galaxias/runs/train/2026-05-11_09-59-23__job52687__prueba1
+================================================================
+Construyendo la imagen Docker...
+Sending build context to Docker daemon  3.933GB
+Step 1/10 : FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+ ---> ee0418589bdc
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends         build-essential     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 1d8d2f3faaa4
+Step 3/10 : WORKDIR /app
+ ---> Using cache
+ ---> b214daf411e0
+Step 4/10 : COPY requirements.txt .
+ ---> Using cache
+ ---> cc36492036b2
+Step 5/10 : RUN pip install --no-cache-dir -r requirements.txt
+ ---> Using cache
+ ---> 64e631ffc224
+Step 6/10 : COPY train_diffusion_mi_u_net.py .
+ ---> Using cache
+ ---> adefe45fbd5e
+Step 7/10 : COPY generar_galaxia_mi_u_net.py .
+ ---> Using cache
+ ---> 3fae12f3e571
+Step 8/10 : COPY mi_u_net.py .
+ ---> Using cache
+ ---> f85fc42c4591
+Step 9/10 : COPY dataset.py .
+ ---> Using cache
+ ---> 8d832c4c49a1
+Step 10/10 : CMD ["python", "train_diffusion_mi_u_net.py"]
+ ---> Using cache
+ ---> 50f057d8940d
+Successfully built 50f057d8940d
+Successfully tagged galaxias-ml:latest
+Lanzando el entrenamiento...
+======================================================================
+RUN_DIR:    /app/runs/train/2026-05-11_09-59-23__job52687__prueba1
+Config:     configs/train_baseline.yaml
+Device:     cuda
+Configuración final tras merges:
+data:
+  hdf5_path: dataset_galaxias_sin_rgb.h5
+  img_size: 128
+  variables:
+  - ESCALA_KPC_PX
+  - LOG_MS
+  - SFR
+  - EA
+  num_workers: 4
+train:
+  batch_size: 32
+  epochs: 100
+  lr: 0.0002
+  save_every: 10
+  amp: true
+  compile: true
+model:
+  n_channels: 3
+  n_classes: 3
+  embed_dim: 256
+  time_dim: 256
+diffusion:
+  num_train_timesteps: 1000
+
+======================================================================
+Dataset HDF5 enganchado: 20000 galaxias listas para procesar.
+Compilando el modelo con torch.compile()...
+Trabajo finalizado a las lun 11 may 2026 09:59:49 CEST
