@@ -39,6 +39,8 @@ class TrainCfg:
     epochs: int = 100
     lr: float = 2e-4
     save_every: int = 10
+    patience: int = 10
+    min_delta: float = 0.0
     amp: bool = True
     compile: bool = True
 
@@ -241,6 +243,9 @@ def main():
     # AMP compatible con versiones viejas y nuevas de PyTorch
     scaler = make_grad_scaler(device, cfg.train.amp)
 
+    best_loss = float('inf')
+    epochs_no_improve = 0
+
     # ---------- Bucle de entrenamiento ----------
     for epoch in range(cfg.train.epochs):
         unet.train()
@@ -284,14 +289,16 @@ def main():
         with open(metrics_path, "a", newline="") as f:
             csv.writer(f).writerow([epoch + 1, f"{mean_loss:.6f}"])
 
-        # ---------- Checkpoint ----------
-        if (epoch + 1) % cfg.train.save_every == 0:
+        # ---------- Checkpoint & Early Stopping ----------
+        if mean_loss < best_loss - cfg.train.min_delta:
+            best_loss = mean_loss
+            epochs_no_improve = 0
             unet_state = (
                 unet._orig_mod.state_dict()
                 if hasattr(unet, '_orig_mod')
                 else unet.state_dict()
             )
-            ckpt_name = f"modelo_epoca_{epoch+1:03d}.pt"
+            ckpt_name = "mejor_modelo.pt"
             ckpt_path = os.path.join(ckpt_dir, ckpt_name)
             torch.save({
                 'unet': unet_state,
@@ -301,13 +308,13 @@ def main():
                 'mean_loss': mean_loss,
                 'config': OmegaConf.to_container(cfg, resolve=True),
             }, ckpt_path)
-            print(f"  -> Checkpoint guardado: {ckpt_path}")
-
-            # last.pt como symlink al último checkpoint
-            last_link = os.path.join(ckpt_dir, "last.pt")
-            if os.path.islink(last_link) or os.path.exists(last_link):
-                os.remove(last_link)
-            os.symlink(ckpt_name, last_link)
+            print(f"  -> Nuevo mejor modelo guardado: {ckpt_path} (MSE Loss: {best_loss:.6f})")
+        else:
+            epochs_no_improve += 1
+            print(f"  -> Sin mejora. Paciencia: {epochs_no_improve}/{cfg.train.patience}")
+            if epochs_no_improve >= cfg.train.patience:
+                print(f"\nEarly stopping disparado en la época {epoch+1}. Mejor loss: {best_loss:.6f}")
+                break
 
     print(f"\nEntrenamiento completado. Resultados en: {run_dir}")
 
