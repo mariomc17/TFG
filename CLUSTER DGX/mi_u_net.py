@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, time_emb_dim=None):
         super().__init__()
@@ -65,39 +64,26 @@ class Up(nn.Module):
         return self.conv(x, t)
 
 
-class CrossAttentionBlock(nn.Module):
+class FiLMBlock(nn.Module):
     def __init__(self, in_channels, embed_dim=256):
         super().__init__()
-
-        self.query_proj = nn.Linear(in_channels, embed_dim)
-
-        # Módulo de PyTorch
-        self.attention = nn.MultiheadAttention(
-            embed_dim, num_heads=4, batch_first=True)
-
-        self.out_proj = nn.Linear(embed_dim, in_channels)
+        # Proyectamos el embedding físico a Gamma (escala) y Beta (desplazamiento)
+        self.proj = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(embed_dim, in_channels * 2)
+        )
 
     def forward(self, x, physics_context):
-        # x: es la imagen. Forma: [Batch, Canales, Alto, Ancho]
-        # physics_context: es la física. Forma: [Batch, Secuencia (4), Dimensiones (256)]
-
-        B, C, H, W = x.shape
-
-        # Pasa de [Batch, Canales, Alto, Ancho] a [Batch, Píxeles (Alto*Ancho), Canales]
-        x_flat = x.view(B, C, H * W).permute(0, 2, 1)
-
-        # Preguntas Q
-        Q = self.query_proj(x_flat)
-
-        # Claves (K) y valores (V)
-        attn_out, _ = self.attention(
-            query=Q, key=physics_context, value=physics_context)
-
-        attn_out = self.out_proj(attn_out)
-
-        attn_out = attn_out.permute(0, 2, 1).view(B, C, H, W)
-
-        return x + attn_out
+        # physics_context forma esperada: [Batch, embed_dim]
+        emb = self.proj(physics_context)
+        gamma, beta = emb.chunk(2, dim=-1)
+        
+        # Expandimos dimensiones para que coincidan con [B, C, H, W]
+        gamma = gamma[..., None, None]
+        beta = beta[..., None, None]
+        
+        # Aplicamos la modulación
+        return x * (1 + gamma) + beta
 
 
 class SinusoidalPositionEmbeddings(nn.Module):

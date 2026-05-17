@@ -70,21 +70,16 @@ class Config:
 # Módulo PhysicsProjector (se importa desde el script de generación).
 # =====================================================================
 class PhysicsProjector(nn.Module):
-    def __init__(self, input_dim, embed_dim=256, seq_len=4):
+    def __init__(self, input_dim, embed_dim=256):
         super().__init__()
-        self.seq_len = seq_len
-        self.embed_dim = embed_dim
         self.net = nn.Sequential(
             nn.Linear(input_dim, 128),
             nn.GELU(),
-            nn.Linear(128, 256),
-            nn.GELU(),
-            nn.Linear(256, embed_dim * seq_len),
+            nn.Linear(128, embed_dim), # Salida directa a embed_dim
         )
 
     def forward(self, x):
-        projected = self.net(x)
-        return projected.view(-1, self.seq_len, self.embed_dim)
+        return self.net(x) # Forma final: [Batch, embed_dim]
 
 
 # =====================================================================
