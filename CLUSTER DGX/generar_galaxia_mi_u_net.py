@@ -25,7 +25,6 @@ class GalaxySpec:
     etiqueta: str = "galaxia"
     escala: float = 0.5
     masa: float = 0.5
-    sfr: float = 0.5
     ea: float = 0.5
 
 
@@ -75,7 +74,7 @@ def generar_una(unet, projector, scheduler, device, img_size, spec, output_dir):
     
     # Vector físico real
     phys_vector = torch.tensor(
-        [[spec.escala, spec.masa, spec.sfr, spec.ea]],
+        [[spec.escala, spec.masa, spec.ea]],
         dtype=torch.float32,
     ).to(device)
     
@@ -119,11 +118,11 @@ def generar_una(unet, projector, scheduler, device, img_size, spec, output_dir):
     plt.title(
         f"{spec.etiqueta}\n"
         f"Esc={spec.escala:.2f} | M={spec.masa:.2f} "
-        f"| SFR={spec.sfr:.2f} | EA={spec.ea:.2f}"
+        f"| EA={spec.ea:.2f}"
     )
     nombre_archivo = (
         f"{spec.etiqueta}__esc{spec.escala:.2f}_m{spec.masa:.2f}"
-        f"_sfr{spec.sfr:.2f}_ea{spec.ea:.2f}.png"
+        f"_ea{spec.ea:.2f}.png"
     )
     ruta = os.path.join(output_dir, nombre_archivo)
     plt.savefig(ruta, dpi=300, bbox_inches='tight')
@@ -180,7 +179,7 @@ def main():
         n_channels=n_channels, n_classes=n_classes,
         embed_dim=embed_dim, time_dim=time_dim,
     ).to(device)
-    projector = PhysicsProjector(input_dim=4, embed_dim=embed_dim).to(device)
+    projector = PhysicsProjector(input_dim=3, embed_dim=embed_dim).to(device)
 
     unet.load_state_dict(checkpoint['unet'])
     projector.load_state_dict(checkpoint['projector'])

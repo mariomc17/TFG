@@ -29,7 +29,7 @@ class DataCfg:
     hdf5_path: str = "dataset_galaxias_sin_rgb.h5"
     img_size: int = 128
     variables: List[str] = field(default_factory=lambda: [
-        'ESCALA_KPC_PX', 'LOG_MS', 'SFR', 'EA'])
+        'ESCALA_KPC_PX', 'LOG_MS', 'EA'])
     num_workers: int = 4
 
 
