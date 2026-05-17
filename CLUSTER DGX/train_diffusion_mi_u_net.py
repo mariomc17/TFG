@@ -210,7 +210,11 @@ def main():
     )
 
     noise_scheduler = DDPMScheduler(
-        num_train_timesteps=cfg.diffusion.num_train_timesteps)
+        num_train_timesteps=cfg.diffusion.num_train_timesteps,
+        prediction_type="v_prediction",
+        rescale_betas_zero_snr=True,
+        timestep_spacing="trailing"
+    )
 
     # ---------- Modelo ----------
     unet = CustomGalaxyUNet(
@@ -249,7 +253,7 @@ def main():
         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{cfg.train.epochs}")
 
         for batch in progress_bar:
-            clean_images, phys_vectors = batch
+clean_images, phys_vectors = batch
             clean_images = clean_images.to(device)
             phys_vectors = phys_vectors.to(device)
 
@@ -262,14 +266,37 @@ def main():
             noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
             optimizer.zero_grad(set_to_none=True)
 
+            # --- IMPLEMENTACIÓN DE CFG (15% de probabilidad de condicionamiento nulo) ---
+            drop_prob = 0.15
+            mask = torch.rand(bsz, device=device) < drop_prob
+            phys_vectors_cfg = phys_vectors.clone()
+            phys_vectors_cfg[mask] = 0.0 # Vector nulo para aprender generación incondicional
+
             with autocast_context(device, cfg.train.amp):
-                encoder_hidden_states = projector(phys_vectors)
-                noise_pred = unet(
+                encoder_hidden_states = projector(phys_vectors_cfg)
+                # La U-Net ahora predice la velocidad 'v', no el ruido 'epsilon'
+                pred = unet(
                     x=noisy_images,
                     context=encoder_hidden_states,
                     timesteps=timesteps,
                 )
-                loss = criterion(noise_pred, noise)
+                
+                # Objetivo de v-prediction
+                target = noise_scheduler.get_velocity(clean_images, noise, timesteps)
+                
+                # --- IMPLEMENTACIÓN MIN-SNR WEIGHTING ---
+                alphas_cumprod = noise_scheduler.alphas_cumprod.to(device)
+                a_t = alphas_cumprod[timesteps]
+                snr = a_t / (1 - a_t)
+                snr_weight = torch.clamp(snr, max=5.0) # Recortamos a 5.0
+                # Ajuste específico para v-prediction:
+                snr_weight = snr_weight / (snr + 1)
+                
+                # MSE Ponderado
+                loss = nn.functional.mse_loss(pred, target, reduction="none")
+                # Promediamos sobre canales/pixeles, mantenemos batch
+                loss = loss.mean(dim=[1, 2, 3]) 
+                loss = (loss * snr_weight).mean() # Ponderación y media final
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
