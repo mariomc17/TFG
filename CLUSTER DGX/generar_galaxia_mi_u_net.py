@@ -69,20 +69,46 @@ def parse_args():
 # =====================================================================
 # Lógica de generación
 # =====================================================================
+
 def generar_una(unet, projector, scheduler, device, img_size, spec, output_dir):
     image = torch.randn((1, 3, img_size, img_size)).to(device)
+    
+    # Vector físico real
     phys_vector = torch.tensor(
         [[spec.escala, spec.masa, spec.sfr, spec.ea]],
         dtype=torch.float32,
     ).to(device)
+    
+    # Vector nulo para CFG
+    uncond_vector = torch.zeros_like(phys_vector)
+    
+    # Escala de Guidance (CFG). Prueba valores entre 3.0 y 7.0
+    guidance_scale = 5.0 
 
     with torch.inference_mode():
-        encoder_hidden_states = projector(phys_vector)
+        # Proyectamos ambos (condicional e incondicional)
+        cond_emb = projector(phys_vector)
+        uncond_emb = projector(uncond_vector)
+        # Concatenamos para pasarlos en un solo batch a la U-Net y ahorrar tiempo
+        context = torch.cat([uncond_emb, cond_emb])
+
         for t in tqdm(scheduler.timesteps, desc=f"Esculpiendo {spec.etiqueta}", leave=False):
-            t_batch = torch.tensor([t], dtype=torch.long, device=device)
-            noise_pred = unet(
-                x=image, context=encoder_hidden_states, timesteps=t_batch)
-            image = scheduler.step(noise_pred, t, image).prev_sample
+            # Duplicamos la imagen y el timestep para el batch doble
+            latent_model_input = torch.cat([image] * 2)
+            t_batch = torch.tensor([t] * 2, dtype=torch.long, device=device)
+            
+            # Predecir (v-prediction)
+            pred = unet(x=latent_model_input, context=context, timesteps=t_batch)
+            
+            # Separar las predicciones
+            pred_uncond, pred_cond = pred.chunk(2)
+            
+            # Aplicar la fórmula del Classifier-Free Guidance
+            # Extrapolamos alejándonos de la predicción incondicional hacia la condicional
+            pred_guided = pred_uncond + guidance_scale * (pred_cond - pred_uncond)
+            
+            # Dar un paso en la difusión
+            image = scheduler.step(pred_guided, t, image).prev_sample
 
     image = (image / 2 + 0.5).clamp(0, 1)
     image = image.cpu().permute(0, 2, 3, 1).numpy()[0]
@@ -161,7 +187,12 @@ def main():
     unet.eval()
     projector.eval()
 
-    scheduler = DDIMScheduler(num_train_timesteps=1000)
+    scheduler = DDIMScheduler(
+        num_train_timesteps=1000,
+        prediction_type="v_prediction",
+        rescale_betas_zero_snr=True,
+        timestep_spacing="trailing"
+    )
     scheduler.set_timesteps(cfg.inference_steps)
 
     # Guarda la config efectiva al lado de las imágenes
