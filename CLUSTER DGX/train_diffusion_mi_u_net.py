@@ -253,7 +253,7 @@ def main():
         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{cfg.train.epochs}")
 
         for batch in progress_bar:
-clean_images, phys_vectors = batch
+            clean_images, phys_vectors = batch
             clean_images = clean_images.to(device)
             phys_vectors = phys_vectors.to(device)
 
