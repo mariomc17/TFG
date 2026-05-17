@@ -121,12 +121,12 @@ class CustomGalaxyUNet(nn.Module):
         self.down3 = Down(256, 512, time_emb_dim=time_dim)
 
         # Cross Attention intermedio (Mejora)
-        self.cross_attn_down3 = CrossAttentionBlock(
+        self.cross_attn_down3 = FiLMBlock(
             in_channels=512, embed_dim=embed_dim)
 
         # Cuello de botella
         self.down4 = Down(512, 1024, time_emb_dim=time_dim)
-        self.cross_attn = CrossAttentionBlock(
+        self.cross_attn = FiLMBlock(
             in_channels=1024, embed_dim=embed_dim)
 
         # Decoder
@@ -134,7 +134,7 @@ class CustomGalaxyUNet(nn.Module):
         self.up2 = Up(512, 256, time_emb_dim=time_dim)
 
         # Cross Attention intermedio (Mejora)
-        self.cross_attn_up2 = CrossAttentionBlock(
+        self.cross_attn_up2 = FiLMBlock(
             in_channels=256, embed_dim=embed_dim)
 
         self.up3 = Up(256, 128, time_emb_dim=time_dim)
