@@ -1,213 +1,603 @@
-import torch
-import matplotlib.pyplot as plt
-import os
+"""
+generar_galaxia_mi_u_net.py — Inferencia DDIM con CFG para el diffusion U-Net.
+
+Cambios respecto a la versión anterior:
+  ✓ Carga pesos EMA ('unet_ema') del checkpoint, no los pesos brutos ('unet')
+  ✓ Usa projector.get_null_embedding() para el embedding incondicional (CFG correcto)
+  ✓ Lee norm_stats del checkpoint para normalizar los inputs físicos
+  ✓ GalaxySpec actualizado a valores físicos reales (unidades naturales, no min-max)
+  ✓ Condicionamiento parcial: se puede especificar un subconjunto de variables;
+    el resto se rellena con null_tokens para que la red lo ignore
+  ✓ guidance_scale como parámetro configurable (no hardcoded)
+  ✓ Generación por grids (barrido de un parámetro) para análisis de sensibilidad
+
+Física de los parámetros (unidades reales):
+    escala_kpc_px : kpc / pixel           (típico: 0.13 – 2.85 kpc/px)
+    log_ms        : log10(M_sol)          (típico: 8.0 – 12.0)
+    ea_gyr        : Edad estelar en Gyr   (típico: 0.5 – 10 Gyr)
+    radio_p_arcsec: Radio Petrosian en "  (típico: 3 – 30 arcsec)
+"""
+
 import argparse
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Optional
+import os
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from omegaconf import OmegaConf
+import numpy as np
+import torch
 from diffusers import DDIMScheduler
-from tqdm import tqdm
 
+# ── Imports locales ───────────────────────────────────────────────────────────
 from mi_u_net import CustomGalaxyUNet
-# Reutilizamos PhysicsProjector del script de entrenamiento (no se duplica)
+from PIL import Image, ImageDraw, ImageFont
 from train_diffusion_mi_u_net import PhysicsProjector
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# ══════════════════════════════════════════════════════════════════════════════
+# Especificación de una galaxia a generar
+# ══════════════════════════════════════════════════════════════════════════════
 
 
-# =====================================================================
-# Schema del config de generación.
-# =====================================================================
 @dataclass
 class GalaxySpec:
+    """
+    Especificación física de una galaxia a generar.
+
+    Todos los valores están en sus unidades físicas naturales, NO en min-max.
+    El script se encarga de la normalización usando los stats del checkpoint.
+
+    Condicionamiento parcial: cualquier campo puede pasarse como None para
+    que la red use el null_token de esa dimensión (no incluye información
+    de esa variable). Esto permite, por ejemplo, generar galaxias fijando
+    solo la masa y dejando que la red "decida" el resto.
+    """
+
     etiqueta: str = "galaxia"
-    escala: float = 0.5
-    masa: float = 0.5
-    ea: float = 0.5
+
+    # ── Variables físicas (None = usar null token para esa dimensión) ─────
+    escala_kpc_px: Optional[float] = 0.80  # kpc / pixel
+    log_ms: Optional[float] = 10.0  # log10(M_sol)
+    ea_gyr: Optional[float] = 2.0  # Edad estelar [Gyr]
+    radio_p_arcsec: Optional[float] = 10.0  # Radio Petrosian [arcsec]
 
 
-@dataclass
-class GenConfig:
-    # Ruta al .pt. Si es null, submit_gen.sh debe pasarla por CLI override.
-    checkpoint: Optional[str] = None
-    # Tamaño que debe coincidir con el de entrenamiento.
-    # Se autocompletará desde el checkpoint si está disponible.
-    img_size: int = 128
-    inference_steps: int = 50
-    galaxies: List[GalaxySpec] = field(default_factory=list)
+# ══════════════════════════════════════════════════════════════════════════════
+# Normalización usando los stats del checkpoint
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Correspondencia entre atributos de GalaxySpec y nombres de variable en el HDF5
+_SPEC_TO_VAR = {
+    "escala_kpc_px": "ESCALA_KPC_PX",
+    "log_ms": "LOG_MS",
+    "ea_gyr": "EA",
+    "radio_p_arcsec": "RADIO_P",
+}
+
+# Variables que requieren log1p antes del Z-score (debe coincidir con dataset.py)
+_LOG1P_VARS = frozenset({"EA", "ESCALA_KPC_PX", "RADIO_P"})
 
 
-# =====================================================================
-# Helpers
-# =====================================================================
-def load_config(yaml_path, cli_overrides):
-    schema = OmegaConf.structured(GenConfig)
-    file_cfg = OmegaConf.load(yaml_path) if yaml_path else OmegaConf.create({})
-    cli_cfg = OmegaConf.from_dotlist(cli_overrides) if cli_overrides else OmegaConf.create({})
-    cfg = OmegaConf.merge(schema, file_cfg, cli_cfg)
-    return cfg
+def normalize_value(value: float, var_name: str, norm_stats: dict) -> float:
+    """
+    Normaliza un valor físico usando los estadísticos del checkpoint.
+
+    Orden idéntico al de dataset.py:
+      1. Clip al rango [clip_lo, clip_hi] del training data
+      2. log1p si corresponde
+      3. Z-score
+    """
+    s = norm_stats[var_name]
+    value = float(np.clip(value, s["clip_lo"], s["clip_hi"]))
+    if s["log_transform"]:
+        value = float(np.log1p(max(value, 0.0)))
+    return (value - s["mean"]) / (s["std"] + 1e-8)
 
 
-def resolve_output_dir():
-    """Prioridad: env var OUTPUT_DIR > cwd."""
-    return os.environ.get("OUTPUT_DIR", os.getcwd())
+def build_phys_vector(
+    spec: GalaxySpec,
+    variables: List[str],
+    norm_stats: dict,
+    null_tokens: torch.Tensor,
+    device: torch.device,
+) -> tuple:
+    """
+    Construye el vector físico normalizado a partir de un GalaxySpec.
+
+    Para variables con valor None, inserta el null_token aprendido de esa
+    dimensión. Devuelve también una máscara booleana indicando qué dimensiones
+    son nulas (para el cálculo del prompt en el CFG).
+
+    Returns:
+        phys_vector : [1, N_vars]  tensor normalizado
+        null_mask   : [N_vars]     True donde se usa null_token
+    """
+    # Mapa de variable → valor de spec
+    spec_values: Dict[str, Optional[float]] = {}
+    for attr, var_name in _SPEC_TO_VAR.items():
+        spec_values[var_name] = getattr(spec, attr, None)
+
+    vec = []
+    null_mask = []
+    for i, var_name in enumerate(variables):
+        val = spec_values.get(var_name, None)
+        if val is None:
+            # Null token en espacio crudo (antes de normalización)
+            # El null_tokens[i] ya está en el mismo espacio normalizado
+            vec.append(null_tokens[i].item())
+            null_mask.append(True)
+        else:
+            vec.append(normalize_value(val, var_name, norm_stats))
+            null_mask.append(False)
+
+    phys_vector = torch.tensor(vec, dtype=torch.float32).unsqueeze(0).to(device)
+    return phys_vector, null_mask
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Generación DDIM con CFG
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@torch.no_grad()
+def generate_galaxy(
+    spec: GalaxySpec,
+    unet: CustomGalaxyUNet,
+    projector: PhysicsProjector,
+    noise_scheduler: DDIMScheduler,
+    variables: List[str],
+    norm_stats: dict,
+    device: torch.device,
+    guidance_scale: float = 7.5,
+    seed: Optional[int] = None,
+    img_size: int = 128,
+) -> torch.Tensor:
+    """
+    Genera una galaxia con DDIM y CFG.
+
+    Args:
+        spec            : especificación física de la galaxia
+        unet            : modelo U-Net con pesos EMA cargados
+        projector       : PhysicsProjector con null_tokens cargados
+        noise_scheduler : DDIMScheduler configurado
+        variables       : lista de nombres de variables (del checkpoint)
+        norm_stats      : estadísticos de normalización (del checkpoint)
+        device          : dispositivo de computación
+        guidance_scale  : escala de guidance libre de clasificador
+                          1.0 = sin guidance; 7.5 = punto de equilibrio calidad/diversidad
+        seed            : semilla para reproducibilidad
+        img_size        : tamaño de la imagen
+
+    Returns:
+        Tensor [3, img_size, img_size] en el rango [-1, 1]
+    """
+    unet.eval()
+    projector.eval()
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    # ── Vector físico condicional ──────────────────────────────────────────
+    phys_vector, null_mask = build_phys_vector(
+        spec, variables, norm_stats, projector.null_tokens, device
+    )
+
+    # ── Embeddings para CFG ────────────────────────────────────────────────
+    cond_emb = projector(phys_vector)  # [1, D]
+    uncond_emb = projector.get_null_embedding(1, device)  # [1, D]
+
+    # Batch de 2 para CFG eficiente (una pasada por el UNet)
+    cond_combined = torch.cat([uncond_emb, cond_emb], dim=0)  # [2, D]
+
+    # ── Ruido inicial ─────────────────────────────────────────────────────
+    latent = torch.randn(1, 3, img_size, img_size, device=device)
+
+    # ── Loop de denoising DDIM ────────────────────────────────────────────
+    noise_scheduler.set_timesteps(50)
+
+    for t in noise_scheduler.timesteps:
+        latent_input = torch.cat([latent, latent], dim=0)  # [2, 3, H, W]
+        t_batch = t.unsqueeze(0).repeat(2).to(device)  # [2]
+
+        noise_pred = unet(
+            x=latent_input,
+            cond_emb=cond_combined,
+            timesteps=t_batch,
+        )
+
+        # Guidance libre de clasificador (Classifier-Free Guidance)
+        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + guidance_scale * (
+            noise_pred_cond - noise_pred_uncond
+        )
+
+        latent = noise_scheduler.step(noise_pred, t, latent).prev_sample
+
+    return latent.squeeze(0)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Conversión a imagen PIL
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def tensor_to_pil(tensor: torch.Tensor) -> Image.Image:
+    """Convierte tensor [3, H, W] en rango [-1, 1] a imagen PIL RGB."""
+    img = tensor.cpu().float().clamp(-1, 1)
+    img = (img + 1.0) / 2.0  # → [0, 1]
+    img = img.permute(1, 2, 0).numpy()
+    img = (img * 255).astype(np.uint8)
+    return Image.fromarray(img)
+
+
+def annotate_image(
+    img: Image.Image,
+    spec: GalaxySpec,
+    variables: List[str],
+) -> Image.Image:
+    """Añade una anotación con los parámetros físicos de la galaxia."""
+    W, H = img.size
+    margin = 40
+    new_img = Image.new("RGB", (W, H + margin), color=(20, 20, 20))
+    new_img.paste(img, (0, margin))
+    draw = ImageDraw.Draw(new_img)
+
+    title = spec.etiqueta
+    # Construir línea de parámetros con valores reales
+    param_parts = []
+    for attr, var_name in _SPEC_TO_VAR.items():
+        val = getattr(spec, attr, None)
+        short = var_name.split("_")[0] if "_" in var_name else var_name
+        if val is None:
+            param_parts.append(f"{short}=—")
+        else:
+            param_parts.append(f"{short}={val:.2f}")
+    subtitle = " | ".join(param_parts)
+
+    try:
+        font_title = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11
+        )
+        font_sub = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9
+        )
+    except IOError:
+        font_title = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+
+    draw.text((4, 2), title, font=font_title, fill=(230, 230, 230))
+    draw.text((4, 16), subtitle, font=font_sub, fill=(180, 180, 180))
+
+    return new_img
+
+
+def make_grid(images: List[Image.Image], cols: int = 4) -> Image.Image:
+    """Crea un grid de imágenes PIL."""
+    rows = (len(images) + cols - 1) // cols
+    W, H = images[0].size
+    grid = Image.new("RGB", (W * cols, H * rows), color=(10, 10, 10))
+    for i, img in enumerate(images):
+        r, c = divmod(i, cols)
+        grid.paste(img, (c * W, r * H))
+    return grid
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Carga del checkpoint
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def load_checkpoint(ckpt_path: str, device: torch.device):
+    """
+    Carga el checkpoint y devuelve los modelos y metadatos.
+
+    Carga los pesos EMA (unet_ema), no los pesos brutos (unet),
+    ya que el EMA produce imágenes de mayor calidad.
+
+    Returns:
+        unet, projector, noise_scheduler, variables, norm_stats
+    """
+    print(f"Cargando checkpoint: {ckpt_path}")
+    checkpoint = torch.load(ckpt_path, map_location=device)
+
+    # Extraer metadatos del checkpoint
+    variables = checkpoint["variables"]
+    norm_stats = checkpoint["norm_stats"]
+    cfg_dict = checkpoint.get("config", {})
+
+    print(f"  Variables: {variables}")
+    print(f"  Época guardada: {checkpoint.get('epoch', '?')}")
+    print(f"  Mejor loss: {checkpoint.get('mean_loss', '?'):.6f}")
+
+    # Reconstruir configuración del modelo
+    model_cfg = cfg_dict.get("model", {})
+    embed_dim = model_cfg.get("embed_dim", 256)
+    dropout = cfg_dict.get("train", {}).get("dropout", 0.0)
+
+    # ── U-Net (pesos EMA) ─────────────────────────────────────────────────
+    unet = CustomGalaxyUNet(
+        n_channels=model_cfg.get("n_channels", 3),
+        n_classes=model_cfg.get("n_classes", 3),
+        embed_dim=embed_dim,
+        dropout=dropout,  # dropout=0 en inferencia; nn.Dropout lo maneja con eval()
+    ).to(device)
+
+    unet.load_state_dict(checkpoint["unet_ema"])
+    unet.eval()
+    print("  ✓ Pesos EMA cargados en U-Net")
+
+    # ── Projector ─────────────────────────────────────────────────────────
+    projector = PhysicsProjector(
+        input_dim=len(variables),
+        embed_dim=embed_dim,
+    ).to(device)
+
+    projector.load_state_dict(checkpoint["projector"])
+    projector.eval()
+    print("  ✓ PhysicsProjector cargado (con null_tokens aprendidos)")
+
+    # ── Scheduler DDIM ────────────────────────────────────────────────────
+    noise_scheduler = DDIMScheduler(
+        num_train_timesteps=cfg_dict.get("diffusion", {}).get(
+            "num_train_timesteps", 1000
+        ),
+        prediction_type="v_prediction",
+        rescale_betas_zero_snr=True,
+        timestep_spacing="trailing",
+    )
+
+    return unet, projector, noise_scheduler, variables, norm_stats
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modos de generación
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def run_examples(unet, projector, noise_scheduler, variables, norm_stats, device, args):
+    """Genera galaxias de ejemplo según un conjunto de specs predefinidas."""
+
+    ejemplo_specs = [
+        GalaxySpec(
+            "espiral_masiva_vieja",
+            log_ms=10.8,
+            ea_gyr=7.0,
+            escala_kpc_px=0.5,
+            radio_p_arcsec=18.0,
+        ),
+        GalaxySpec(
+            "espiral_media_joven",
+            log_ms=9.5,
+            ea_gyr=1.5,
+            escala_kpc_px=0.8,
+            radio_p_arcsec=10.0,
+        ),
+        GalaxySpec(
+            "espiral_difusa_activa",
+            log_ms=9.0,
+            ea_gyr=0.8,
+            escala_kpc_px=1.2,
+            radio_p_arcsec=8.0,
+        ),
+        GalaxySpec(
+            "compacta_masiva",
+            log_ms=11.0,
+            ea_gyr=8.0,
+            escala_kpc_px=0.2,
+            radio_p_arcsec=5.0,
+        ),
+        GalaxySpec(
+            "distante_tipica",
+            log_ms=10.2,
+            ea_gyr=3.0,
+            escala_kpc_px=1.8,
+            radio_p_arcsec=6.0,
+        ),
+        GalaxySpec(
+            "cercana_extendida",
+            log_ms=9.8,
+            ea_gyr=4.0,
+            escala_kpc_px=0.3,
+            radio_p_arcsec=25.0,
+        ),
+        # Condicionamiento parcial: solo masa
+        GalaxySpec(
+            "solo_masa_alta",
+            log_ms=11.0,
+            ea_gyr=None,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+        GalaxySpec(
+            "solo_masa_baja",
+            log_ms=8.5,
+            ea_gyr=None,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+        # Condicionamiento parcial: masa + edad
+        GalaxySpec(
+            "masa_y_edad_joven",
+            log_ms=10.0,
+            ea_gyr=0.5,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+        GalaxySpec(
+            "masa_y_edad_vieja",
+            log_ms=10.0,
+            ea_gyr=9.0,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+        # Completamente incondicional
+        GalaxySpec(
+            "incondicional_1",
+            log_ms=None,
+            ea_gyr=None,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+        GalaxySpec(
+            "incondicional_2",
+            log_ms=None,
+            ea_gyr=None,
+            escala_kpc_px=None,
+            radio_p_arcsec=None,
+        ),
+    ]
+
+    imagenes = []
+    for i, spec in enumerate(ejemplo_specs):
+        print(f"Generando {i + 1}/{len(ejemplo_specs)}: {spec.etiqueta}")
+        tensor = generate_galaxy(
+            spec,
+            unet,
+            projector,
+            noise_scheduler,
+            variables,
+            norm_stats,
+            device,
+            guidance_scale=args.guidance_scale,
+            seed=args.seed + i if args.seed is not None else None,
+        )
+        img = tensor_to_pil(tensor)
+        img = annotate_image(img, spec, variables)
+        imagenes.append(img)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+    grid = make_grid(imagenes, cols=4)
+    out_path = os.path.join(args.output_dir, "ejemplos_galaxias.png")
+    grid.save(out_path)
+    print(f"\nGrid guardado en: {out_path}")
+
+
+def run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, args):
+    """
+    Barrido de un parámetro físico, fijando los demás a valores típicos.
+    Útil para analizar la sensibilidad del modelo al condicionamiento.
+    """
+    sweep_var = args.sweep_var
+    sweep_range_map = {
+        "log_ms": (8.0, 12.0, 8),
+        "ea_gyr": (0.5, 10.0, 8),
+        "escala_kpc_px": (0.15, 2.5, 8),
+        "radio_p_arcsec": (3.0, 30.0, 8),
+    }
+
+    if sweep_var not in sweep_range_map:
+        print(f"sweep_var debe ser uno de: {list(sweep_range_map.keys())}")
+        return
+
+    lo, hi, n = sweep_range_map[sweep_var]
+    valores = np.linspace(lo, hi, n)
+
+    imagenes = []
+    for v in valores:
+        kwargs = {
+            "log_ms": 10.0,
+            "ea_gyr": 3.0,
+            "escala_kpc_px": 0.8,
+            "radio_p_arcsec": 10.0,
+        }
+        kwargs[sweep_var] = float(v)
+        spec = GalaxySpec(etiqueta=f"{sweep_var}={v:.2f}", **kwargs)
+        print(f"  {spec.etiqueta}")
+        tensor = generate_galaxy(
+            spec,
+            unet,
+            projector,
+            noise_scheduler,
+            variables,
+            norm_stats,
+            device,
+            guidance_scale=args.guidance_scale,
+            seed=args.seed,
+        )
+        img = tensor_to_pil(tensor)
+        img = annotate_image(img, spec, variables)
+        imagenes.append(img)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+    grid = make_grid(imagenes, cols=n)
+    out_path = os.path.join(args.output_dir, f"sweep_{sweep_var}.png")
+    grid.save(out_path)
+    print(f"Sweep guardado en: {out_path}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Entrypoint
+# ══════════════════════════════════════════════════════════════════════════════
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Generar galaxias condicionadas por física (batch).")
+        description="Generación de galaxias con CFG + DDIM."
+    )
     parser.add_argument(
-        "--config", type=str, default="configs/gen_examples.yaml",
-        help="YAML con checkpoint, pasos y la lista 'galaxies'.")
-    args, overrides = parser.parse_known_args()
-    return args, overrides
-
-
-# =====================================================================
-# Lógica de generación
-# =====================================================================
-
-def generar_una(unet, projector, scheduler, device, img_size, spec, output_dir):
-    image = torch.randn((1, 3, img_size, img_size)).to(device)
-    
-    # Vector físico real
-    phys_vector = torch.tensor(
-        [[spec.escala, spec.masa, spec.ea]],
-        dtype=torch.float32,
-    ).to(device)
-    
-    # Vector nulo para CFG
-    uncond_vector = torch.zeros_like(phys_vector)
-    
-    # Escala de Guidance (CFG). Prueba valores entre 3.0 y 7.0
-    guidance_scale = 5.0 
-
-    with torch.inference_mode():
-        # Proyectamos ambos (condicional e incondicional)
-        cond_emb = projector(phys_vector)
-        uncond_emb = projector(uncond_vector)
-        # Concatenamos para pasarlos en un solo batch a la U-Net y ahorrar tiempo
-        context = torch.cat([uncond_emb, cond_emb])
-
-        for t in tqdm(scheduler.timesteps, desc=f"Esculpiendo {spec.etiqueta}", leave=False):
-            # Duplicamos la imagen y el timestep para el batch doble
-            latent_model_input = torch.cat([image] * 2)
-            t_batch = torch.tensor([t] * 2, dtype=torch.long, device=device)
-            
-            # Predecir (v-prediction)
-            pred = unet(x=latent_model_input, context=context, timesteps=t_batch)
-            
-            # Separar las predicciones
-            pred_uncond, pred_cond = pred.chunk(2)
-            
-            # Aplicar la fórmula del Classifier-Free Guidance
-            # Extrapolamos alejándonos de la predicción incondicional hacia la condicional
-            pred_guided = pred_uncond + guidance_scale * (pred_cond - pred_uncond)
-            
-            # Dar un paso en la difusión
-            image = scheduler.step(pred_guided, t, image).prev_sample
-
-    image = (image / 2 + 0.5).clamp(0, 1)
-    image = image.cpu().permute(0, 2, 3, 1).numpy()[0]
-
-    plt.figure(figsize=(6, 6))
-    plt.imshow(image)
-    plt.axis('off')
-    plt.title(
-        f"{spec.etiqueta}\n"
-        f"Esc={spec.escala:.2f} | M={spec.masa:.2f} "
-        f"| EA={spec.ea:.2f}"
+        "--checkpoint",
+        type=str,
+        required=True,
+        help="Ruta al checkpoint .pt (debe contener 'unet_ema' y 'norm_stats')",
     )
-    nombre_archivo = (
-        f"{spec.etiqueta}__esc{spec.escala:.2f}_m{spec.masa:.2f}"
-        f"_ea{spec.ea:.2f}.png"
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="galaxias_generadas",
+        help="Directorio de salida para las imágenes",
     )
-    ruta = os.path.join(output_dir, nombre_archivo)
-    plt.savefig(ruta, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"  -> Guardado: {ruta}")
+    parser.add_argument(
+        "--guidance_scale",
+        type=float,
+        default=7.5,
+        help="Escala CFG. 1.0=sin guidance, 7.5=equilibrio calidad/diversidad",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="examples",
+        choices=["examples", "sweep"],
+        help="Modo: 'examples' genera un set de specs; 'sweep' barre un parámetro",
+    )
+    parser.add_argument(
+        "--sweep_var",
+        type=str,
+        default="log_ms",
+        choices=["log_ms", "ea_gyr", "escala_kpc_px", "radio_p_arcsec"],
+        help="Variable a barrer en modo sweep",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Semilla para reproducibilidad (None para aleatoria)",
+    )
+    parser.add_argument(
+        "--n_steps",
+        type=int,
+        default=50,
+        help="Número de pasos DDIM (más pasos = mayor calidad, más lento)",
+    )
+    return parser.parse_args()
 
 
 def main():
-    args, overrides = parse_args()
-    cfg = load_config(args.config, overrides)
-
-    if cfg.checkpoint is None:
-        raise SystemExit(
-            "ERROR: no se ha especificado 'checkpoint'. "
-            "Pásalo en el YAML o vía CLI: 'checkpoint=/ruta/al/modelo.pt'"
-        )
-    if not cfg.galaxies:
-        raise SystemExit(
-            "ERROR: la lista 'galaxies' del YAML está vacía. No hay nada que generar."
-        )
-
+    args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if device.type == 'cpu':
-        torch.set_num_threads(os.cpu_count() or 4)
+    print(f"Dispositivo: {device}")
+    print(f"Guidance scale: {args.guidance_scale}")
 
-    output_dir = resolve_output_dir()
-    os.makedirs(output_dir, exist_ok=True)
-
-    print("=" * 70)
-    print(f"Device:        {device}")
-    print(f"Checkpoint:    {cfg.checkpoint}")
-    print(f"Pasos DDIM:    {cfg.inference_steps}")
-    print(f"# de galaxias: {len(cfg.galaxies)}")
-    print(f"Output dir:    {output_dir}")
-    print("=" * 70)
-
-    # ---- Cargar checkpoint ----
-    checkpoint = torch.load(cfg.checkpoint, map_location=device, weights_only=False)
-
-    # Si el checkpoint guardó config, recuperamos img_size y dims de modelo
-    ckpt_cfg = checkpoint.get('config', {}) or {}
-    data_cfg = ckpt_cfg.get('data', {}) if isinstance(ckpt_cfg, dict) else {}
-    model_cfg = ckpt_cfg.get('model', {}) if isinstance(ckpt_cfg, dict) else {}
-
-    img_size = data_cfg.get('img_size', cfg.img_size)
-    embed_dim = model_cfg.get('embed_dim', 256)
-    time_dim = model_cfg.get('time_dim', 256)
-    n_channels = model_cfg.get('n_channels', 3)
-    n_classes = model_cfg.get('n_classes', 3)
-
-    print(f"Modelo: {img_size}x{img_size}, embed_dim={embed_dim}, time_dim={time_dim}")
-
-    unet = CustomGalaxyUNet(
-        n_channels=n_channels, n_classes=n_classes,
-        embed_dim=embed_dim, time_dim=time_dim,
-    ).to(device)
-    projector = PhysicsProjector(input_dim=3, embed_dim=embed_dim).to(device)
-
-    unet.load_state_dict(checkpoint['unet'])
-    projector.load_state_dict(checkpoint['projector'])
-    unet.eval()
-    projector.eval()
-
-    scheduler = DDIMScheduler(
-        num_train_timesteps=1000,
-        prediction_type="v_prediction",
-        rescale_betas_zero_snr=True,
-        timestep_spacing="trailing"
+    unet, projector, noise_scheduler, variables, norm_stats = load_checkpoint(
+        args.checkpoint, device
     )
-    scheduler.set_timesteps(cfg.inference_steps)
 
-    # Guarda la config efectiva al lado de las imágenes
-    parent_dir = os.path.dirname(output_dir) if output_dir.endswith("images") else output_dir
-    OmegaConf.save(cfg, os.path.join(parent_dir, "config_used.yaml"))
+    # Configurar número de pasos DDIM
+    noise_scheduler.set_timesteps(args.n_steps)
 
-    # ---- Iteración sobre galaxias ----
-    print(f"\nGenerando {len(cfg.galaxies)} galaxias...\n")
-    for i, spec_dict in enumerate(cfg.galaxies, start=1):
-        # Cada spec viene como DictConfig (OmegaConf); lo materializamos a dataclass
-        spec = OmegaConf.merge(OmegaConf.structured(GalaxySpec), spec_dict)
-        print(f"[{i}/{len(cfg.galaxies)}] {spec.etiqueta}")
-        generar_una(unet, projector, scheduler, device,
-                    img_size, spec, output_dir)
-
-    print(f"\nListo. {len(cfg.galaxies)} imágenes en {output_dir}")
+    if args.mode == "examples":
+        run_examples(
+            unet, projector, noise_scheduler, variables, norm_stats, device, args
+        )
+    elif args.mode == "sweep":
+        run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, args)
 
 
 if __name__ == "__main__":
