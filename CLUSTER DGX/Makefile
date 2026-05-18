@@ -84,7 +84,7 @@ status: ## Jobs SLURM propios en cola/ejecución
 list-runs: ## Lista runs de entrenamiento/generación, más reciente primero
 	@printf "$(B)Runs de entrenamiento:$(R)\n"
 	@for d in $$(ls -1dt runs/train/*/ 2>/dev/null | head -20); do \
-	  n=$$(ls -1 $$d/checkpoints/modelo_epoca_*.pt 2>/dev/null | wc -l); \
+	  n=$$(ls -1 $$d/checkpoints/*.pt 2>/dev/null | wc -l); \
 	  ok="$(G)OK$(R)"; \
 	  [ $$n -eq 0 ] && ok="$(Y)sin ckpts$(R)"; \
 	  printf "  %s  [%s, %d ckpts]\n" "$$d" "$$ok" "$$n"; \
