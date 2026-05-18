@@ -34,7 +34,7 @@ INTERVAL  ?= 2
 
 SRUN_BASE = srun --account=$(ACCOUNT) --partition=$(PARTITION) --gres=gpu:$(GPUS) --cpus-per-task=$(CPUS) --mem=$(MEM) --time=$(TIME)
 
-.PHONY: help build build-local train gen status list-runs tail tail-err clean-pending shell show-config gpu gpu-watch nvtop htop
+.PHONY: help build build-local train gen status list-runs tail tail-err clean-pending shell show-config resources resources-watch gpu gpu-watch nvtop htop
 
 help: ## Muestra esta ayuda
 	@printf "$(B)Galaxias U-Net — comandos$(R)\n\n"
@@ -62,6 +62,8 @@ help: ## Muestra esta ayuda
 	@printf "  $(C)make show-config CONFIG=configs/train_lr_alto.yaml EXTRA=\"train.epochs=3\"$(R)\n"
 	@printf "  $(C)make train TAG=quick_test EXTRA=\"train.epochs=3 train.compile=false\"$(R)\n"
 	@printf "  $(C)make gen EXTRA=\"inference_steps=100\"$(R)\n"
+	@printf "  $(C)make resources$(R)\n"
+	@printf "  $(C)make resources-watch JOB=52549 INTERVAL=5$(R)\n"
 	@printf "  $(C)make gpu$(R)\n"
 	@printf "  $(C)make gpu-watch JOB=52549 INTERVAL=5$(R)\n"
 	@printf "  $(C)make htop$(R)\n"
@@ -118,6 +120,53 @@ show-config: ## Imprime la config efectiva tras merges dentro del contenedor, v�
 shell: ## bash interactivo dentro del contenedor en un nodo dgx vía srun
 	$(SRUN_BASE) --pty docker run --gpus all --rm -it --ipc=host \
 	  -u $$(id -u):$$(id -g) -v "$$(pwd)":/app -w /app $(IMAGE) bash
+
+resources: ## Lectura puntual de CPU/RAM/VRAM del job RUNNING más reciente o JOB=<id>
+	@job="$(JOB)"; \
+	if [ "$$job" = "latest" ]; then \
+	  job=$$(squeue -h -u $$USER -t RUNNING -o "%i" | tail -n1); \
+	fi; \
+	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
+	echo "$(B)Job SLURM $$job$(R)"; \
+	squeue -j "$$job" -o "%.10i %.12P %.24j %.8T %.10M %.10l %.6D %C %m %R"; \
+	echo; \
+	echo "$(B)CPU/RAM según SLURM accounting$(R)"; \
+	if command -v sstat >/dev/null 2>&1; then \
+	  sstat -j "$$job.batch" --format=JobID,AveCPU,MaxRSS,AveRSS,MaxVMSize,NTasks 2>/dev/null || \
+	  sstat -j "$$job" --format=JobID,AveCPU,MaxRSS,AveRSS,MaxVMSize,NTasks 2>/dev/null || true; \
+	else \
+	  echo "sstat no está disponible en este login node."; \
+	fi; \
+	echo; \
+	echo "$(B)GPU/VRAM y procesos principales en el nodo del job$(R)"; \
+	srun --jobid="$$job" --overlap bash -lc 'hostname; echo; nvidia-smi; echo; ps -eo pid,ppid,pcpu,pmem,rss,vsz,cmd --sort=-rss | head -20'
+
+resources-watch: ## Monitoriza CPU/RAM/VRAM periódicamente sin detener el job original
+	@job="$(JOB)"; \
+	if [ "$$job" = "latest" ]; then \
+	  job=$$(squeue -h -u $$USER -t RUNNING -o "%i" | tail -n1); \
+	fi; \
+	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
+	echo "Monitorizando job $$job cada $(INTERVAL)s; Ctrl-C detiene solo este monitor."; \
+	while true; do \
+	  clear; \
+	  date; \
+	  echo; \
+	  echo "$(B)Job SLURM $$job$(R)"; \
+	  squeue -j "$$job" -o "%.10i %.12P %.24j %.8T %.10M %.10l %.6D %C %m %R"; \
+	  echo; \
+	  echo "$(B)CPU/RAM según SLURM accounting$(R)"; \
+	  if command -v sstat >/dev/null 2>&1; then \
+	    sstat -j "$$job.batch" --format=JobID,AveCPU,MaxRSS,AveRSS,MaxVMSize,NTasks 2>/dev/null || \
+	    sstat -j "$$job" --format=JobID,AveCPU,MaxRSS,AveRSS,MaxVMSize,NTasks 2>/dev/null || true; \
+	  else \
+	    echo "sstat no está disponible en este login node."; \
+	  fi; \
+	  echo; \
+	  echo "$(B)GPU/VRAM en el nodo del job$(R)"; \
+	  srun --jobid="$$job" --overlap bash -lc 'hostname; nvidia-smi --query-gpu=timestamp,index,name,utilization.gpu,utilization.memory,memory.used,memory.total,power.draw --format=csv; echo; nvidia-smi pmon -c 1 2>/dev/null || true'; \
+	  sleep $(INTERVAL); \
+	done
 
 gpu: ## Ejecuta una lectura de nvidia-smi en el nodo del job RUNNING más reciente o JOB=<id>
 	@job="$(JOB)"; \
