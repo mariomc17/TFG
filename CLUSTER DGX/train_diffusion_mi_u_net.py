@@ -337,6 +337,37 @@ def autocast_context(device: torch.device, enabled: bool):
     return torch.cuda.amp.autocast(dtype=torch.float16, enabled=True)
 
 
+def build_checkpoint(
+    unet: nn.Module,
+    unet_raw: nn.Module,
+    projector: nn.Module,
+    ema: EMAModel,
+    dataset: GalaxiasFisicasDataset,
+    cfg,
+    epoch: int,
+    mean_loss: float,
+    best_loss: float,
+) -> dict:
+    """Construye un checkpoint completo, incluyendo pesos EMA para inferencia."""
+    unet_ema_save = copy.deepcopy(unet_raw)
+    ema.copy_to(unet_ema_save)
+    return {
+        # Pesos para inferencia.
+        "unet_ema": unet_ema_save.state_dict(),
+        # Pesos para continuar training.
+        "unet": get_raw_state_dict(unet),
+        "projector": projector.state_dict(),
+        "ema_state": ema.state_dict(),
+        # Metadatos críticos para inferencia.
+        "variables": list(cfg.data.variables),
+        "norm_stats": dataset.norm_stats,
+        "epoch": epoch,
+        "mean_loss": mean_loss,
+        "best_loss": best_loss,
+        "config": OmegaConf.to_container(cfg, resolve=True),
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Entrenamiento
 # ══════════════════════════════════════════════════════════════════════════════
@@ -526,32 +557,37 @@ def main():
             csv.writer(f).writerow([epoch + 1, f"{mean_loss:.6f}", f"{best_loss:.6f}"])
 
         # ── Checkpoint & Early Stopping ───────────────────────────────────
-        if mean_loss < best_loss - cfg.train.min_delta:
+        improved = mean_loss < best_loss - cfg.train.min_delta
+        if improved:
+            next_best_loss = mean_loss
+        else:
+            next_best_loss = best_loss
+
+        ckpt = build_checkpoint(
+            unet=unet,
+            unet_raw=unet_raw,
+            projector=projector,
+            ema=ema,
+            dataset=dataset,
+            cfg=cfg,
+            epoch=epoch + 1,
+            mean_loss=mean_loss,
+            best_loss=next_best_loss,
+        )
+        last_path = os.path.join(ckpt_dir, "last.pt")
+        torch.save(ckpt, last_path)
+
+        if cfg.train.save_every > 0 and (epoch + 1) % cfg.train.save_every == 0:
+            periodic_path = os.path.join(ckpt_dir, f"modelo_epoca_{epoch + 1:03d}.pt")
+            torch.save(ckpt, periodic_path)
+            print(f"  → Checkpoint periódico guardado: {periodic_path}")
+
+        if improved:
             best_loss = mean_loss
             epochs_no_improve = 0
 
-            # Crear copia del modelo raw y transferir pesos EMA para guardar
-            unet_ema_save = copy.deepcopy(unet_raw)
-            ema.copy_to(unet_ema_save)
-
             ckpt_path = os.path.join(ckpt_dir, "mejor_modelo.pt")
-            torch.save(
-                {
-                    # ── Pesos para inferencia (EMA) ────────────────────────
-                    "unet_ema": unet_ema_save.state_dict(),
-                    # ── Pesos para continuar training (brutos) ─────────────
-                    "unet": get_raw_state_dict(unet),
-                    "projector": projector.state_dict(),
-                    "ema_state": ema.state_dict(),
-                    # ── Metadatos críticos para inferencia ─────────────────
-                    "variables": list(cfg.data.variables),
-                    "norm_stats": dataset.norm_stats,  # ← imprescindible para normalizar en inferencia
-                    "epoch": epoch + 1,
-                    "mean_loss": mean_loss,
-                    "config": OmegaConf.to_container(cfg, resolve=True),
-                },
-                ckpt_path,
-            )
+            torch.save(ckpt, ckpt_path)
             print(
                 f"  → Nuevo mejor modelo guardado (EMA): {ckpt_path} (loss: {best_loss:.6f})"
             )
