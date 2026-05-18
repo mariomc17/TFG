@@ -46,7 +46,7 @@ docker build -t galaxias-ml .
 RUN_DIR_IN_CONT="/app/${RUN_DIR#$R/}"
 
 echo "Lanzando el entrenamiento..."
-docker run --gpus device=$SLURM_IDX --name $NOMBRECONT --rm \
+docker run --gpus all --name $NOMBRECONT --rm \
   --ipc=host \
   -e HOME=/app \
   -e HF_HOME=/app/.cache \
