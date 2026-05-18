@@ -5,30 +5,51 @@
 # solo lo que necesites.
 
 data:
+  # Ruta al dataset HDF5 montado dentro del contenedor.
   hdf5_path: dataset_galaxias_sin_rgb.h5
+  # Tamaño cuadrado al que se redimensionan las imágenes de entrada.
   img_size: 128
+  # Variables físicas usadas como condicionamiento, en este orden.
   variables: [ESCALA_KPC_PX, LOG_MS, EA, RADIO_P]
+  # Procesos paralelos del DataLoader para cargar batches.
   num_workers: 4
+  # Activa aumentos de imagen y ruido físico basado en errores de medida.
   augment: true
 
 train:
+  # Número de galaxias por batch de entrenamiento.
   batch_size: 32
+  # Número máximo de épocas.
   epochs: 200
+  # Learning rate del optimizador AdamW.
   lr: 1.0e-4
-  save_every: 10
+  # Guarda checkpoint periódico cada N épocas.
+  save_every: 20
+  # Épocas sin mejora antes de parar por early stopping.
   patience: 20
+  # Mejora mínima de loss requerida para resetear la paciencia.
   min_delta: 1.0e-5
+  # Usa mixed precision en CUDA para reducir memoria y acelerar.
   amp: true
+  # Compila la U-Net con torch.compile cuando hay CUDA.
   compile: true
+  # Dropout interno de los ResBlocks de la U-Net.
   dropout: 0.1
+  # Probabilidad de ocultar el condicionamiento físico durante training (CFG).
   cfg_drop_prob: 0.15
+  # Decay objetivo del promedio exponencial de pesos usado en inferencia.
   ema_decay: 0.9999
+  # Pasos iniciales para calentar suavemente el EMA.
   ema_warmup_steps: 1000
 
 model:
+  # Canales de entrada de la imagen; RGB = 3.
   n_channels: 3
+  # Canales de salida predichos por la U-Net; RGB = 3.
   n_classes: 3
+  # Dimensión del embedding físico y temporal usado para condicionar la U-Net.
   embed_dim: 256
 
 diffusion:
+  # Número de timesteps del scheduler de difusión durante entrenamiento.
   num_train_timesteps: 1000

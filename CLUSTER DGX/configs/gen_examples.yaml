@@ -1,49 +1,141 @@
 # configs/gen_examples.yaml
 # Galaxias a generar en un job. Cada entrada produce un PNG y un grid final.
-# 'checkpoint: null' deja que submit_gen.sh autodescubra el último last.pt.
+# 'checkpoint: null' deja que submit_gen.sh autodescubra el mejor modelo.
 # Los valores están en unidades físicas reales, no normalizados [0, 1].
 
+# Ruta al checkpoint .pt; null permite que submit_gen.sh use mejor_modelo.pt.
 checkpoint: null
+# Directorio de salida; null usa OUTPUT_DIR definido por el job Slurm.
 output_dir: null
+# Tamaño cuadrado de imagen a generar; debe coincidir con el entrenamiento.
 img_size: 128
-inference_steps: 50
+# Número de pasos DDIM de denoising; más pasos suele ser más lento y estable.
+inference_steps: 100
+# Fuerza del classifier-free guidance; 1.0 equivale a sin guidance.
 guidance_scale: 7.5
+# Modo de generación: examples usa esta lista; sweep barre una variable.
 mode: examples
+# Semilla base para reproducibilidad; cada ejemplo suma su índice.
 seed: 42
 
+# Lista de especificaciones físicas a generar.
 galaxies:
-  - etiqueta: 01_espiral_masiva_vieja
-    escala_kpc_px: 0.50
-    log_ms: 10.8
-    ea_gyr: 7.0
-    radio_p_arcsec: 18.0
-
-  - etiqueta: 02_espiral_media_joven
-    escala_kpc_px: 0.80
-    log_ms: 9.5
-    ea_gyr: 1.5
-    radio_p_arcsec: 10.0
-
-  - etiqueta: 03_distante_tipica
-    escala_kpc_px: 1.80
+  - etiqueta: 01_tipica_mediana
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.90
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
     log_ms: 10.2
-    ea_gyr: 3.0
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 1.4
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 9.0
+
+  - etiqueta: 02_baja_masa_joven_compacta
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.65
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 9.2
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 0.7
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
     radio_p_arcsec: 6.0
 
-  - etiqueta: 04_cercana_extendida
-    escala_kpc_px: 0.30
-    log_ms: 9.8
-    ea_gyr: 4.0
-    radio_p_arcsec: 25.0
+  - etiqueta: 03_masa_media_joven_extendida
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.75
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.0
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 0.8
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 14.0
 
-  - etiqueta: 05_solo_masa_alta
-    escala_kpc_px: null
-    log_ms: 11.0
-    ea_gyr: null
-    radio_p_arcsec: null
+  - etiqueta: 04_masiva_madura_grande
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 1.10
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.9
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 3.2
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 18.0
 
-  - etiqueta: 06_incondicional
+  - etiqueta: 05_masiva_muy_vieja
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 1.00
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 11.3
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 6.0
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 16.0
+
+  - etiqueta: 06_cercana_extendida
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.25
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.1
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 1.8
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 35.0
+
+  - etiqueta: 07_distante_compacta
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 2.10
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.3
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 1.5
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 5.0
+
+  - etiqueta: 08_alta_escala_limite
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 2.50
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.4
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 1.6
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 8.0
+
+  - etiqueta: 09_radio_grande_outlier
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.60
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 10.5
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 2.0
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 55.0
+
+  - etiqueta: 10_masa_baja_extrema
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 0.80
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 8.9
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 1.0
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 7.0
+
+  - etiqueta: 11_masa_alta_extrema
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
+    escala_kpc_px: 1.00
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
+    log_ms: 11.6
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
+    ea_gyr: 2.5
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
+    radio_p_arcsec: 15.0
+
+  - etiqueta: 12_incondicional
+    # Escala angular física en kpc por píxel; null deja esta variable sin condicionar.
     escala_kpc_px: null
+    # Masa estelar log10(M_sol); null deja esta variable sin condicionar.
     log_ms: null
+    # Edad estelar en Gyr; null deja esta variable sin condicionar.
     ea_gyr: null
+    # Radio Petrosian en arcsec; null deja esta variable sin condicionar.
     radio_p_arcsec: null
