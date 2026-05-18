@@ -20,12 +20,14 @@ Física de los parámetros (unidades reales):
 
 import argparse
 import os
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
 import torch
 from diffusers import DDIMScheduler
+from omegaconf import OmegaConf
 
 # ── Imports locales ───────────────────────────────────────────────────────────
 from mi_u_net import CustomGalaxyUNet
@@ -58,6 +60,20 @@ class GalaxySpec:
     log_ms: Optional[float] = 10.0  # log10(M_sol)
     ea_gyr: Optional[float] = 2.0  # Edad estelar [Gyr]
     radio_p_arcsec: Optional[float] = 10.0  # Radio Petrosian [arcsec]
+
+
+@dataclass
+class GenConfig:
+    # Si es null, submit_gen.sh lo pasa como override checkpoint=/ruta/al/ckpt.pt.
+    checkpoint: Optional[str] = None
+    output_dir: Optional[str] = None
+    img_size: int = 128
+    inference_steps: int = 50
+    guidance_scale: float = 7.5
+    mode: str = "examples"
+    sweep_var: str = "log_ms"
+    seed: Optional[int] = 42
+    galaxies: List[GalaxySpec] = field(default_factory=list)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -191,8 +207,6 @@ def generate_galaxy(
     latent = torch.randn(1, 3, img_size, img_size, device=device)
 
     # ── Loop de denoising DDIM ────────────────────────────────────────────
-    noise_scheduler.set_timesteps(50)
-
     for t in noise_scheduler.timesteps:
         latent_input = torch.cat([latent, latent], dim=0)  # [2, 3, H, W]
         t_batch = t.unsqueeze(0).repeat(2).to(device)  # [2]
@@ -280,6 +294,12 @@ def make_grid(images: List[Image.Image], cols: int = 4) -> Image.Image:
     return grid
 
 
+def safe_filename(name: str) -> str:
+    """Convierte una etiqueta libre en un nombre de archivo estable."""
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name.strip())
+    return name.strip("._") or "galaxia"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Carga del checkpoint
 # ══════════════════════════════════════════════════════════════════════════════
@@ -296,7 +316,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
         unet, projector, noise_scheduler, variables, norm_stats
     """
     print(f"Cargando checkpoint: {ckpt_path}")
-    checkpoint = torch.load(ckpt_path, map_location=device)
+    checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
 
     # Extraer metadatos del checkpoint
     variables = checkpoint["variables"]
@@ -305,7 +325,11 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
 
     print(f"  Variables: {variables}")
     print(f"  Época guardada: {checkpoint.get('epoch', '?')}")
-    print(f"  Mejor loss: {checkpoint.get('mean_loss', '?'):.6f}")
+    mean_loss = checkpoint.get("mean_loss")
+    if mean_loss is None:
+        print("  Loss guardada: ?")
+    else:
+        print(f"  Loss guardada: {float(mean_loss):.6f}")
 
     # Reconstruir configuración del modelo
     model_cfg = cfg_dict.get("model", {})
@@ -355,7 +379,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
 def run_examples(unet, projector, noise_scheduler, variables, norm_stats, device, args):
     """Genera galaxias de ejemplo según un conjunto de specs predefinidas."""
 
-    ejemplo_specs = [
+    ejemplo_specs = list(args.galaxies) if args.galaxies else [
         GalaxySpec(
             "espiral_masiva_vieja",
             log_ms=10.8,
@@ -458,9 +482,17 @@ def run_examples(unet, projector, noise_scheduler, variables, norm_stats, device
             device,
             guidance_scale=args.guidance_scale,
             seed=args.seed + i if args.seed is not None else None,
+            img_size=args.img_size,
         )
         img = tensor_to_pil(tensor)
         img = annotate_image(img, spec, variables)
+        out_file = os.path.join(
+            args.output_dir,
+            f"{i + 1:02d}_{safe_filename(spec.etiqueta)}.png",
+        )
+        os.makedirs(args.output_dir, exist_ok=True)
+        img.save(out_file)
+        print(f"  → Guardado: {out_file}")
         imagenes.append(img)
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -511,6 +543,7 @@ def run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, a
             device,
             guidance_scale=args.guidance_scale,
             seed=args.seed,
+            img_size=args.img_size,
         )
         img = tensor_to_pil(tensor)
         img = annotate_image(img, spec, variables)
@@ -533,9 +566,15 @@ def parse_args():
         description="Generación de galaxias con CFG + DDIM."
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/gen_examples.yaml",
+        help="YAML con checkpoint, pasos DDIM, guidance y lista 'galaxies'.",
+    )
+    parser.add_argument(
         "--checkpoint",
         type=str,
-        required=True,
+        default=None,
         help="Ruta al checkpoint .pt (debe contener 'unet_ema' y 'norm_stats')",
     )
     parser.add_argument(
@@ -573,31 +612,97 @@ def parse_args():
     parser.add_argument(
         "--n_steps",
         type=int,
-        default=50,
-        help="Número de pasos DDIM (más pasos = mayor calidad, más lento)",
+        default=None,
+        help="Alias CLI de inference_steps.",
     )
-    return parser.parse_args()
+    args, overrides = parser.parse_known_args()
+    return args, overrides
+
+
+def load_config(yaml_path: str, cli_overrides: List[str]):
+    schema = OmegaConf.structured(GenConfig)
+    file_cfg = OmegaConf.load(yaml_path) if yaml_path else OmegaConf.create({})
+    cli_cfg = (
+        OmegaConf.from_dotlist(cli_overrides) if cli_overrides else OmegaConf.create({})
+    )
+    return OmegaConf.merge(schema, file_cfg, cli_cfg)
+
+
+def resolve_config(args, overrides):
+    cfg = load_config(args.config, overrides)
+
+    if args.checkpoint is not None:
+        cfg.checkpoint = args.checkpoint
+    if args.output_dir != "galaxias_generadas":
+        cfg.output_dir = args.output_dir
+    if args.guidance_scale != 7.5:
+        cfg.guidance_scale = args.guidance_scale
+    if args.mode != "examples":
+        cfg.mode = args.mode
+    if args.sweep_var != "log_ms":
+        cfg.sweep_var = args.sweep_var
+    if args.seed != 42:
+        cfg.seed = args.seed
+    if args.n_steps is not None:
+        cfg.inference_steps = args.n_steps
+
+    if cfg.output_dir is None:
+        cfg.output_dir = os.environ.get("OUTPUT_DIR", "galaxias_generadas")
+
+    if cfg.checkpoint is None:
+        raise SystemExit(
+            "ERROR: falta 'checkpoint'. Indícalo en el YAML, con "
+            "--checkpoint o como override: checkpoint=/ruta/modelo.pt"
+        )
+
+    cfg.galaxies = [
+        OmegaConf.to_object(OmegaConf.merge(OmegaConf.structured(GalaxySpec), spec))
+        for spec in cfg.galaxies
+    ]
+    return cfg
 
 
 def main():
-    args = parse_args()
+    args, overrides = parse_args()
+    cfg = resolve_config(args, overrides)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    os.makedirs(cfg.output_dir, exist_ok=True)
+    parent_dir = (
+        os.path.dirname(cfg.output_dir)
+        if os.path.basename(cfg.output_dir) == "images"
+        else cfg.output_dir
+    )
+    os.makedirs(parent_dir, exist_ok=True)
+    OmegaConf.save(cfg, os.path.join(parent_dir, "config_used.yaml"))
+
+    print("=" * 70)
     print(f"Dispositivo: {device}")
-    print(f"Guidance scale: {args.guidance_scale}")
+    print(f"Config:      {args.config}")
+    if overrides:
+        print(f"Overrides:   {overrides}")
+    print(f"Checkpoint:  {cfg.checkpoint}")
+    print(f"Output dir:  {cfg.output_dir}")
+    print(f"Modo:        {cfg.mode}")
+    print(f"Pasos DDIM:  {cfg.inference_steps}")
+    print(f"Guidance:    {cfg.guidance_scale}")
+    print("=" * 70)
 
     unet, projector, noise_scheduler, variables, norm_stats = load_checkpoint(
-        args.checkpoint, device
+        cfg.checkpoint, device
     )
 
     # Configurar número de pasos DDIM
-    noise_scheduler.set_timesteps(args.n_steps)
+    noise_scheduler.set_timesteps(cfg.inference_steps)
 
-    if args.mode == "examples":
+    if cfg.mode == "examples":
         run_examples(
-            unet, projector, noise_scheduler, variables, norm_stats, device, args
+            unet, projector, noise_scheduler, variables, norm_stats, device, cfg
         )
-    elif args.mode == "sweep":
-        run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, args)
+    elif cfg.mode == "sweep":
+        run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, cfg)
+    else:
+        raise SystemExit("ERROR: mode debe ser 'examples' o 'sweep'.")
 
 
 if __name__ == "__main__":
