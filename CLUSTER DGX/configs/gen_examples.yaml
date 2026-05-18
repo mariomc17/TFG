@@ -1,26 +1,49 @@
 # configs/gen_examples.yaml
-# Galaxias a generar en un job. Cada entrada produce un PNG.
-# 'checkpoint: null' deja que submit_gen.sh autodescubra el último.
-# Todos los valores físicos son normalizados [0.0 - 1.0].
+# Galaxias a generar en un job. Cada entrada produce un PNG y un grid final.
+# 'checkpoint: null' deja que submit_gen.sh autodescubra el último last.pt.
+# Los valores están en unidades físicas reales, no normalizados [0, 1].
 
 checkpoint: null
+output_dir: null
+img_size: 128
 inference_steps: 50
+guidance_scale: 7.5
+mode: examples
+seed: 42
 
 galaxies:
-  - etiqueta: 01_eliptica_masiva_inactiva
-    escala: 0.2
-    masa: 0.95
-    sfr: 0.10
-    ea: 0.10
+  - etiqueta: 01_espiral_masiva_vieja
+    escala_kpc_px: 0.50
+    log_ms: 10.8
+    ea_gyr: 7.0
+    radio_p_arcsec: 18.0
 
-  - etiqueta: 02_espiral_difusa_activa
-    escala: 0.8
-    masa: 0.30
-    sfr: 0.90
-    ea: 0.80
+  - etiqueta: 02_espiral_media_joven
+    escala_kpc_px: 0.80
+    log_ms: 9.5
+    ea_gyr: 1.5
+    radio_p_arcsec: 10.0
 
-  - etiqueta: 03_via_lactea_equilibrada
-    escala: 0.5
-    masa: 0.50
-    sfr: 0.50
-    ea: 0.40
+  - etiqueta: 03_distante_tipica
+    escala_kpc_px: 1.80
+    log_ms: 10.2
+    ea_gyr: 3.0
+    radio_p_arcsec: 6.0
+
+  - etiqueta: 04_cercana_extendida
+    escala_kpc_px: 0.30
+    log_ms: 9.8
+    ea_gyr: 4.0
+    radio_p_arcsec: 25.0
+
+  - etiqueta: 05_solo_masa_alta
+    escala_kpc_px: null
+    log_ms: 11.0
+    ea_gyr: null
+    radio_p_arcsec: null
+
+  - etiqueta: 06_incondicional
+    escala_kpc_px: null
+    log_ms: null
+    ea_gyr: null
+    radio_p_arcsec: null

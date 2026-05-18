@@ -7,22 +7,28 @@
 data:
   hdf5_path: dataset_galaxias_sin_rgb.h5
   img_size: 128
-  variables: [ESCALA_KPC_PX, LOG_MS, SFR, EA]
+  variables: [ESCALA_KPC_PX, LOG_MS, EA, RADIO_P]
   num_workers: 4
+  augment: true
 
 train:
   batch_size: 32
-  epochs: 100
-  lr: 2.0e-4
+  epochs: 200
+  lr: 1.0e-4
   save_every: 10
+  patience: 20
+  min_delta: 1.0e-5
   amp: true
   compile: true
+  dropout: 0.1
+  cfg_drop_prob: 0.15
+  ema_decay: 0.9999
+  ema_warmup_steps: 1000
 
 model:
   n_channels: 3
   n_classes: 3
   embed_dim: 256
-  time_dim: 256
 
 diffusion:
   num_train_timesteps: 1000
