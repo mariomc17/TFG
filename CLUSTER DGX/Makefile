@@ -127,6 +127,8 @@ resources: ## Lectura puntual de CPU/RAM/VRAM del job RUNNING más reciente o JO
 	  job=$$(squeue -h -u $$USER -t RUNNING -o "%i" | tail -n1); \
 	fi; \
 	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
+	node=$$(squeue -h -j "$$job" -o "%N" | awk '{print $$1}'); \
+	[ -n "$$node" ] || { echo "No encuentro el nodo del job $$job."; exit 1; }; \
 	echo "$(B)Job SLURM $$job$(R)"; \
 	squeue -j "$$job" -o "%.10i %.12P %.24j %.8T %.10M %.10l %.6D %C %m %R"; \
 	echo; \
@@ -138,8 +140,18 @@ resources: ## Lectura puntual de CPU/RAM/VRAM del job RUNNING más reciente o JO
 	  echo "sstat no está disponible en este login node."; \
 	fi; \
 	echo; \
-	echo "$(B)GPU/VRAM y procesos principales en el nodo del job$(R)"; \
-	srun --jobid="$$job" --overlap bash -lc 'hostname; echo; nvidia-smi; echo; ps -eo pid,ppid,pcpu,pmem,rss,vsz,cmd --sort=-rss | head -20'
+	echo "$(B)Docker + GPU/VRAM en $$node$(R)"; \
+	ssh "$$node" "job='$$job'; \
+	  echo Host:; hostname; \
+	  echo; \
+	  echo 'Docker stats del contenedor del job:'; \
+	  docker stats --no-stream \\\"\\$${job}_galaxias\\\" \\\"\\$${job}_generador\\\" 2>/dev/null || true; \
+	  echo; \
+	  echo 'GPU asignada y procesos CUDA:'; \
+	  nvidia-smi; \
+	  echo; \
+	  echo 'Procesos del usuario relacionados con este proyecto:'; \
+	  ps -u \\\"\\$$USER\\\" -o pid,ppid,pcpu,pmem,rss,vsz,cmd --sort=-rss | grep -E \\\"\\$${job}|train_diffusion|generar_galaxia|galaxias-ml\\\" | grep -v grep || true"
 
 resources-watch: ## Monitoriza CPU/RAM/VRAM periódicamente sin detener el job original
 	@job="$(JOB)"; \
@@ -147,6 +159,8 @@ resources-watch: ## Monitoriza CPU/RAM/VRAM periódicamente sin detener el job o
 	  job=$$(squeue -h -u $$USER -t RUNNING -o "%i" | tail -n1); \
 	fi; \
 	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
+	node=$$(squeue -h -j "$$job" -o "%N" | awk '{print $$1}'); \
+	[ -n "$$node" ] || { echo "No encuentro el nodo del job $$job."; exit 1; }; \
 	echo "Monitorizando job $$job cada $(INTERVAL)s; Ctrl-C detiene solo este monitor."; \
 	while true; do \
 	  clear; \
@@ -163,8 +177,15 @@ resources-watch: ## Monitoriza CPU/RAM/VRAM periódicamente sin detener el job o
 	    echo "sstat no está disponible en este login node."; \
 	  fi; \
 	  echo; \
-	  echo "$(B)GPU/VRAM en el nodo del job$(R)"; \
-	  srun --jobid="$$job" --overlap bash -lc 'hostname; nvidia-smi --query-gpu=timestamp,index,name,utilization.gpu,utilization.memory,memory.used,memory.total,power.draw --format=csv; echo; nvidia-smi pmon -c 1 2>/dev/null || true'; \
+	  echo "$(B)Docker + GPU/VRAM en $$node$(R)"; \
+	  ssh "$$node" "job='$$job'; \
+	    echo Host:; hostname; \
+	    echo; \
+	    docker stats --no-stream \\\"\\$${job}_galaxias\\\" \\\"\\$${job}_generador\\\" 2>/dev/null || true; \
+	    echo; \
+	    nvidia-smi --query-gpu=timestamp,index,name,utilization.gpu,utilization.memory,memory.used,memory.total,power.draw --format=csv; \
+	    echo; \
+	    nvidia-smi pmon -c 1 2>/dev/null || true"; \
 	  sleep $(INTERVAL); \
 	done
 
