@@ -32,7 +32,9 @@ GEN_DIR_IN_CONT="/app/${GEN_DIR#$R/}"
 echo "Construyendo/verificando la imagen Docker..."
 docker build -t galaxias-ml .
 
-docker run --gpus all --name $NOMBRECONT --rm \
+GPU_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+
+docker run --gpus "device=${GPU_DEVICES}" --name $NOMBRECONT --rm \
   --ipc=host \
   -e HF_HOME=/app/.cache \
   -e TORCH_HOME=/app/.cache \

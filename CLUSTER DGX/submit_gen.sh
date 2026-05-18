@@ -30,12 +30,12 @@ if [ -z "$CKPT" ]; then
   echo "No se pasó checkpoint, buscando el checkpoint más reciente..."
   CKPT=""
   for d in $(ls -1dt runs/train/*/ 2>/dev/null); do
-    if [ -f "${d}checkpoints/last.pt" ]; then
-      CKPT="${d}checkpoints/last.pt"
-      break
-    fi
     if [ -f "${d}checkpoints/mejor_modelo.pt" ]; then
       CKPT="${d}checkpoints/mejor_modelo.pt"
+      break
+    fi
+    if [ -f "${d}checkpoints/last.pt" ]; then
+      CKPT="${d}checkpoints/last.pt"
       break
     fi
     latest_epoch=$(ls -1t "${d}"checkpoints/modelo_epoca_*.pt 2>/dev/null | head -n1 || true)

@@ -44,9 +44,10 @@ docker build -t galaxias-ml .
 
 # Traducir ruta de RUN_DIR del host al interior del contenedor
 RUN_DIR_IN_CONT="/app/${RUN_DIR#$R/}"
+GPU_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 
 echo "Lanzando el entrenamiento..."
-docker run --gpus all --name $NOMBRECONT --rm \
+docker run --gpus "device=${GPU_DEVICES}" --name $NOMBRECONT --rm \
   --ipc=host \
   -e HOME=/app \
   -e HF_HOME=/app/.cache \
