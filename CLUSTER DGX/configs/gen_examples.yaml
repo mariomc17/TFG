@@ -12,7 +12,7 @@ img_size: 128
 # Número de pasos DDIM de denoising; más pasos suele ser más lento y estable.
 inference_steps: 100
 # Fuerza del classifier-free guidance; 1.0 equivale a sin guidance.
-guidance_scale: 7.5
+guidance_scale: 3.0
 # Modo de generación: examples usa esta lista; sweep barre una variable.
 mode: examples
 # Semilla base para reproducibilidad; cada ejemplo suma su índice.
