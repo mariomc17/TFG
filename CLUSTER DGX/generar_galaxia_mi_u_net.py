@@ -27,10 +27,10 @@ from typing import Dict, List, Optional
 import numpy as np
 import torch
 from diffusers import DDIMScheduler
-from omegaconf import OmegaConf
 
 # ── Imports locales ───────────────────────────────────────────────────────────
 from mi_u_net import CustomGalaxyUNet
+from omegaconf import OmegaConf
 from PIL import Image, ImageDraw, ImageFont
 from train_diffusion_mi_u_net import PhysicsProjector
 
@@ -228,6 +228,86 @@ def generate_galaxy(
     return latent.squeeze(0)
 
 
+@torch.no_grad()
+def generate_galaxies_batch(
+    specs: List[GalaxySpec],
+    unet: CustomGalaxyUNet,
+    projector: PhysicsProjector,
+    noise_scheduler: DDIMScheduler,
+    variables: List[str],
+    norm_stats: dict,
+    device: torch.device,
+    guidance_scale: float = 7.5,
+    seed: Optional[int] = None,
+    img_size: int = 128,
+) -> List[torch.Tensor]:
+    """
+    Genera N galaxias en una sola pasada batched por el UNet.
+
+    Por qué es mucho más rápido que generar una por una:
+        Versión secuencial (original):  N × T llamadas al UNet, batch_size=2 cada una
+        Versión batched (esta):         T llamadas al UNet,     batch_size=2N cada una
+
+        Con N=12, T=50: 600 llamadas → 50 llamadas.
+        Más importante: batch_size=2 en A100 tiene ~5% GPU utilization;
+        batch_size=24 tiene ~50-60%, lo que da ~8-10× de throughput real.
+
+    Layout del batch por timestep:
+        latents   : [N, 3, H, W]
+        combined  : [2N, D]  — primeras N filas = uncond, siguientes N = cond
+        latents_in: cat([latents, latents]) → [2N, 3, H, W]  (una sola llamada UNet)
+        noise_pred: [2N, 3, H, W]  → split → CFG por elemento
+
+    Returns:
+        Lista de N tensores [3, H, W] en rango [-1, 1], mismo orden que specs.
+    """
+    N = len(specs)
+    if N == 0:
+        return []
+
+    unet.eval()
+    projector.eval()
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    # ── Embeddings de física ──────────────────────────────────────────────
+    phys_vecs = []
+    for spec in specs:
+        phys_vec, _ = build_phys_vector(
+            spec, variables, norm_stats, projector.null_tokens, device
+        )
+        phys_vecs.append(phys_vec)
+    phys_vecs = torch.cat(phys_vecs, dim=0)  # [N, n_vars]
+
+    cond_embs = projector(phys_vecs)  # [N, D]
+    uncond_embs = projector.get_null_embedding(N, device)  # [N, D]
+
+    # Primeras N filas = uncond, siguientes N = cond → un chunk(2) al final separa
+    combined = torch.cat([uncond_embs, cond_embs], dim=0)  # [2N, D]
+
+    # ── Ruido inicial (un canal aleatorio por galaxia) ────────────────────
+    latents = torch.randn(N, 3, img_size, img_size, device=device)  # [N, 3, H, W]
+
+    # ── Loop DDIM — una sola llamada al UNet por timestep ─────────────────
+    for t in noise_scheduler.timesteps:
+        latents_in = torch.cat([latents, latents], dim=0)  # [2N, 3, H, W]
+        t_batch = t.unsqueeze(0).repeat(2 * N).to(device)
+
+        noise_pred = unet(x=latents_in, cond_emb=combined, timesteps=t_batch)
+
+        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)  # cada [N, 3, H, W]
+        noise_guided = noise_pred_uncond + guidance_scale * (
+            noise_pred_cond - noise_pred_uncond
+        )
+
+        latents = noise_scheduler.step(
+            noise_guided, t, latents
+        ).prev_sample  # [N, 3, H, W]
+
+    return [latents[i] for i in range(N)]
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Conversión a imagen PIL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -379,111 +459,125 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
 def run_examples(unet, projector, noise_scheduler, variables, norm_stats, device, args):
     """Genera galaxias de ejemplo según un conjunto de specs predefinidas."""
 
-    ejemplo_specs = list(args.galaxies) if args.galaxies else [
-        GalaxySpec(
-            "espiral_masiva_vieja",
-            log_ms=10.8,
-            ea_gyr=7.0,
-            escala_kpc_px=0.5,
-            radio_p_arcsec=18.0,
-        ),
-        GalaxySpec(
-            "espiral_media_joven",
-            log_ms=9.5,
-            ea_gyr=1.5,
-            escala_kpc_px=0.8,
-            radio_p_arcsec=10.0,
-        ),
-        GalaxySpec(
-            "espiral_difusa_activa",
-            log_ms=9.0,
-            ea_gyr=0.8,
-            escala_kpc_px=1.2,
-            radio_p_arcsec=8.0,
-        ),
-        GalaxySpec(
-            "compacta_masiva",
-            log_ms=11.0,
-            ea_gyr=8.0,
-            escala_kpc_px=0.2,
-            radio_p_arcsec=5.0,
-        ),
-        GalaxySpec(
-            "distante_tipica",
-            log_ms=10.2,
-            ea_gyr=3.0,
-            escala_kpc_px=1.8,
-            radio_p_arcsec=6.0,
-        ),
-        GalaxySpec(
-            "cercana_extendida",
-            log_ms=9.8,
-            ea_gyr=4.0,
-            escala_kpc_px=0.3,
-            radio_p_arcsec=25.0,
-        ),
-        # Condicionamiento parcial: solo masa
-        GalaxySpec(
-            "solo_masa_alta",
-            log_ms=11.0,
-            ea_gyr=None,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-        GalaxySpec(
-            "solo_masa_baja",
-            log_ms=8.5,
-            ea_gyr=None,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-        # Condicionamiento parcial: masa + edad
-        GalaxySpec(
-            "masa_y_edad_joven",
-            log_ms=10.0,
-            ea_gyr=0.5,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-        GalaxySpec(
-            "masa_y_edad_vieja",
-            log_ms=10.0,
-            ea_gyr=9.0,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-        # Completamente incondicional
-        GalaxySpec(
-            "incondicional_1",
-            log_ms=None,
-            ea_gyr=None,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-        GalaxySpec(
-            "incondicional_2",
-            log_ms=None,
-            ea_gyr=None,
-            escala_kpc_px=None,
-            radio_p_arcsec=None,
-        ),
-    ]
+    ejemplo_specs = (
+        list(args.galaxies)
+        if args.galaxies
+        else [
+            GalaxySpec(
+                "espiral_masiva_vieja",
+                log_ms=10.8,
+                ea_gyr=7.0,
+                escala_kpc_px=0.5,
+                radio_p_arcsec=18.0,
+            ),
+            GalaxySpec(
+                "espiral_media_joven",
+                log_ms=9.5,
+                ea_gyr=1.5,
+                escala_kpc_px=0.8,
+                radio_p_arcsec=10.0,
+            ),
+            GalaxySpec(
+                "espiral_difusa_activa",
+                log_ms=9.0,
+                ea_gyr=0.8,
+                escala_kpc_px=1.2,
+                radio_p_arcsec=8.0,
+            ),
+            GalaxySpec(
+                "compacta_masiva",
+                log_ms=11.0,
+                ea_gyr=8.0,
+                escala_kpc_px=0.2,
+                radio_p_arcsec=5.0,
+            ),
+            GalaxySpec(
+                "distante_tipica",
+                log_ms=10.2,
+                ea_gyr=3.0,
+                escala_kpc_px=1.8,
+                radio_p_arcsec=6.0,
+            ),
+            GalaxySpec(
+                "cercana_extendida",
+                log_ms=9.8,
+                ea_gyr=4.0,
+                escala_kpc_px=0.3,
+                radio_p_arcsec=25.0,
+            ),
+            # Condicionamiento parcial: solo masa
+            GalaxySpec(
+                "solo_masa_alta",
+                log_ms=11.0,
+                ea_gyr=None,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+            GalaxySpec(
+                "solo_masa_baja",
+                log_ms=8.5,
+                ea_gyr=None,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+            # Condicionamiento parcial: masa + edad
+            GalaxySpec(
+                "masa_y_edad_joven",
+                log_ms=10.0,
+                ea_gyr=0.5,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+            GalaxySpec(
+                "masa_y_edad_vieja",
+                log_ms=10.0,
+                ea_gyr=9.0,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+            # Completamente incondicional
+            GalaxySpec(
+                "incondicional_1",
+                log_ms=None,
+                ea_gyr=None,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+            GalaxySpec(
+                "incondicional_2",
+                log_ms=None,
+                ea_gyr=None,
+                escala_kpc_px=None,
+                radio_p_arcsec=None,
+            ),
+        ]
+    )
 
     imagenes = []
-    for i, spec in enumerate(ejemplo_specs):
-        print(f"Generando {i + 1}/{len(ejemplo_specs)}: {spec.etiqueta}")
-        tensor = generate_galaxy(
-            spec,
-            unet,
-            projector,
-            noise_scheduler,
-            variables,
-            norm_stats,
-            device,
-            guidance_scale=args.guidance_scale,
-            seed=args.seed + i if args.seed is not None else None,
-            img_size=args.img_size,
-        )
+    print(
+        f"Generando {len(ejemplo_specs)} galaxias en batch (guidance={args.guidance_scale}, pasos={args.inference_steps})..."
+    )
+    t0 = __import__("time").time()
+
+    tensors = generate_galaxies_batch(
+        ejemplo_specs,
+        unet,
+        projector,
+        noise_scheduler,
+        variables,
+        norm_stats,
+        device,
+        guidance_scale=args.guidance_scale,
+        seed=args.seed,
+        img_size=args.img_size,
+    )
+
+    elapsed = __import__("time").time() - t0
+    print(
+        f"Generación completada en {elapsed:.1f}s ({elapsed / len(ejemplo_specs):.1f}s/galaxia)"
+    )
+
+    for i, (spec, tensor) in enumerate(zip(ejemplo_specs, tensors)):
         img = tensor_to_pil(tensor)
         img = annotate_image(img, spec, variables)
         out_file = os.path.join(
@@ -522,7 +616,7 @@ def run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, a
     lo, hi, n = sweep_range_map[sweep_var]
     valores = np.linspace(lo, hi, n)
 
-    imagenes = []
+    sweep_specs = []
     for v in valores:
         kwargs = {
             "log_ms": 10.0,
@@ -531,23 +625,31 @@ def run_sweep(unet, projector, noise_scheduler, variables, norm_stats, device, a
             "radio_p_arcsec": 10.0,
         }
         kwargs[sweep_var] = float(v)
-        spec = GalaxySpec(etiqueta=f"{sweep_var}={v:.2f}", **kwargs)
-        print(f"  {spec.etiqueta}")
-        tensor = generate_galaxy(
-            spec,
-            unet,
-            projector,
-            noise_scheduler,
-            variables,
-            norm_stats,
-            device,
-            guidance_scale=args.guidance_scale,
-            seed=args.seed,
-            img_size=args.img_size,
-        )
-        img = tensor_to_pil(tensor)
-        img = annotate_image(img, spec, variables)
-        imagenes.append(img)
+        sweep_specs.append(GalaxySpec(etiqueta=f"{sweep_var}={v:.2f}", **kwargs))
+
+    print(f"Sweep de '{sweep_var}': {lo} → {hi} en {n} pasos, generando en batch...")
+    t0 = __import__("time").time()
+
+    tensors = generate_galaxies_batch(
+        sweep_specs,
+        unet,
+        projector,
+        noise_scheduler,
+        variables,
+        norm_stats,
+        device,
+        guidance_scale=args.guidance_scale,
+        seed=args.seed,
+        img_size=args.img_size,
+    )
+
+    elapsed = __import__("time").time() - t0
+    print(f"Sweep completado en {elapsed:.1f}s")
+
+    imagenes = [
+        annotate_image(tensor_to_pil(tensor), spec, variables)
+        for spec, tensor in zip(sweep_specs, tensors)
+    ]
 
     os.makedirs(args.output_dir, exist_ok=True)
     grid = make_grid(imagenes, cols=n)
