@@ -34,7 +34,7 @@ INTERVAL  ?= 2
 
 SRUN_BASE = srun --account=$(ACCOUNT) --partition=$(PARTITION) --gres=gpu:$(GPUS) --cpus-per-task=$(CPUS) --mem=$(MEM) --time=$(TIME)
 
-.PHONY: help build build-local train gen status list-runs tail tail-err clean-pending shell show-config resources resources-watch gpu gpu-watch nvtop htop
+.PHONY: help build build-force build-local train gen gen-sweep status list-runs tail tail-err clean-pending shell show-config resources resources-watch gpu gpu-watch nvtop htop
 
 help: ## Muestra esta ayuda
 	@printf "$(B)Galaxias U-Net — comandos$(R)\n\n"
@@ -57,22 +57,44 @@ help: ## Muestra esta ayuda
 	@printf "  $(Y)JOB$(R)         job a monitorizar o latest        (default: $(JOB))\n"
 	@printf "  $(Y)INTERVAL$(R)    segundos entre nvidia-smi         (default: $(INTERVAL))\n"
 	@printf "\n$(B)Ejemplos:$(R)\n"
-	@printf "  $(C)make build$(R)\n"
+	@printf "  $(C)make build$(R)                               # smart: solo si cambiaron deps\n"
+	@printf "  $(C)make build-force$(R)                         # fuerza reconstruccion completa\n"
 	@printf "  $(C)make shell$(R)\n"
 	@printf "  $(C)make show-config CONFIG=configs/train_lr_alto.yaml EXTRA=\"train.epochs=3\"$(R)\n"
 	@printf "  $(C)make train TAG=quick_test EXTRA=\"train.epochs=3 train.compile=false\"$(R)\n"
-	@printf "  $(C)make gen EXTRA=\"inference_steps=100\"$(R)\n"
+	@printf "  $(C)make gen EXTRA=\"inference_steps=100 guidance_scale=9.0\"$(R)\n"
+	@printf "  $(C)make gen-sweep EXTRA=\"sweep_var=ea_gyr\"$(R)\n"
 	@printf "  $(C)make resources$(R)\n"
 	@printf "  $(C)make resources-watch JOB=52549 INTERVAL=5$(R)\n"
 	@printf "  $(C)make gpu$(R)\n"
 	@printf "  $(C)make gpu-watch JOB=52549 INTERVAL=5$(R)\n"
 	@printf "  $(C)make htop$(R)\n"
 
-build: ## Reconstruye la imagen Docker en un nodo dgx vía srun
-	$(SRUN_BASE) docker build -t $(IMAGE) .
+build: ## Construye la imagen Docker en un nodo dgx (solo si cambiaron Dockerfile/requirements.txt)
+	$(SRUN_BASE) bash -c '\
+	  DEPS_HASH=$$(md5sum Dockerfile requirements.txt | md5sum | cut -d" " -f1); \
+	  LABEL=$$(docker inspect --format="{{index .Config.Labels \"deps_hash\"}}" $(IMAGE) 2>/dev/null || echo none); \
+	  if [ "$$LABEL" != "$$DEPS_HASH" ]; then \
+	    echo "Construyendo imagen (hash=$$DEPS_HASH)..."; \
+	    docker build --label "deps_hash=$$DEPS_HASH" -t $(IMAGE) .; \
+	  else \
+	    echo "Imagen $(IMAGE) ya actualizada (hash=$$DEPS_HASH). Usa build-force para forzar."; \
+	  fi'
 
-build-local: ## Reconstruye la imagen Docker en el nodo actual; solo si Docker existe ahí
-	docker build -t $(IMAGE) .
+build-force: ## Fuerza la reconstrucción completa de la imagen Docker (ignora caché de deps)
+	$(SRUN_BASE) docker build --no-cache \
+	  --label "deps_hash=$$(md5sum Dockerfile requirements.txt | md5sum | cut -d' ' -f1)" \
+	  -t $(IMAGE) .
+
+build-local: ## Construye la imagen Docker en el nodo local (solo si cambiaron las deps)
+	@DEPS_HASH=$$(md5sum Dockerfile requirements.txt | md5sum | cut -d' ' -f1); \
+	 LABEL=$$(docker inspect --format='{{index .Config.Labels "deps_hash"}}' $(IMAGE) 2>/dev/null || echo none); \
+	 if [ "$$LABEL" != "$$DEPS_HASH" ]; then \
+	   echo "Construyendo imagen local (hash=$$DEPS_HASH)..."; \
+	   docker build --label "deps_hash=$$DEPS_HASH" -t $(IMAGE) .; \
+	 else \
+	   echo "Imagen $(IMAGE) ya actualizada (hash=$$DEPS_HASH). Usa docker rmi $(IMAGE) para forzar."; \
+	 fi
 
 train: ## Lanza un entrenamiento por SLURM
 	@./submit_train.sh "$(TAG)" "$(CONFIG)" $(EXTRA)
@@ -80,16 +102,22 @@ train: ## Lanza un entrenamiento por SLURM
 gen: ## Genera galaxias por SLURM; usa el último ckpt si no se da CKPT
 	@./submit_gen.sh "$(CKPT)" "$(GEN_CONFIG)" $(EXTRA)
 
+gen-sweep: ## Barrido paramétrico vía SLURM; EXTRA="sweep_var=ea_gyr" para elegir variable
+	@./submit_gen.sh "$(CKPT)" "$(GEN_CONFIG)" mode=sweep $(EXTRA)
+
 status: ## Jobs SLURM propios en cola/ejecución
 	@squeue -u $$USER -o "%.10i %.12P %.20j %.8T %.10M %R"
 
 list-runs: ## Lista runs de entrenamiento/generación, más reciente primero
 	@printf "$(B)Runs de entrenamiento:$(R)\n"
 	@for d in $$(ls -1dt runs/train/*/ 2>/dev/null | head -20); do \
-	  n=$$(ls -1 $$d/checkpoints/*.pt 2>/dev/null | wc -l); \
-	  ok="$(G)OK$(R)"; \
-	  [ $$n -eq 0 ] && ok="$(Y)sin ckpts$(R)"; \
-	  printf "  %s  [%s, %d ckpts]\n" "$$d" "$$ok" "$$n"; \
+	  ckpt="$$d/checkpoints/mejor_modelo.pt"; \
+	  if [ -f "$$ckpt" ]; then \
+	    info=$$(python3 -c "import torch; c=torch.load('$$ckpt',map_location='cpu'); print(f\"ep{c.get('epoch','?')} loss={c.get('mean_loss',0):.5f}\")" 2>/dev/null || echo "?"); \
+	    printf "  %s  [$(G)mejor_modelo.pt$(R) %s]\n" "$$d" "$$info"; \
+	  else \
+	    printf "  %s  [$(Y)sin checkpoint$(R)]\n" "$$d"; \
+	  fi; \
 	done
 	@printf "\n$(B)Runs de generación:$(R)\n"
 	@for d in $$(ls -1dt runs/gen/*/ 2>/dev/null | head -10); do \
@@ -223,3 +251,4 @@ htop: ## Abre htop dentro del nodo del job, si está instalado; si no, cae a top
 	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
 	echo "Monitor CPU/RAM en job $$job; pulsa q o Ctrl-C para salir"; \
 	srun --jobid=$$job --overlap --pty bash -lc 'hostname; if command -v htop >/dev/null 2>&1; then htop; else echo "htop no está instalado; usando top."; top; fi'
+	
