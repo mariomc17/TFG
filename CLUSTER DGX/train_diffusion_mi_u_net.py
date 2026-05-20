@@ -65,9 +65,8 @@ class Config:
     model: ModelCfg = field(default_factory=ModelCfg)
     diffusion: DiffusionCfg = field(default_factory=DiffusionCfg)
 
-# ══════════════════════════════════════════════════════════════════════════════
 # Clases SOTA (Projector + EMA)
-# ══════════════════════════════════════════════════════════════════════════════
+
 class PhysicsProjector(nn.Module):
     def __init__(self, input_dim: int, embed_dim: int = 256):
         super().__init__()
@@ -133,6 +132,22 @@ class EMAModel:
             "shadow": self.shadow, "step": self.step,
             "decay": self.decay, "warmup_steps": self.warmup_steps,
         }
+    
+    @classmethod
+    def from_state_dict(cls, state: dict, model: nn.Module) -> "EMAModel":
+        """Reconstruye EMAModel desde un state_dict guardado."""
+        ema = cls(
+            model,
+            decay=state["decay"],
+            warmup_steps=state.get("warmup_steps", 1000),
+        )
+        ema.shadow = state["shadow"]
+        ema.step = state["step"]
+        return ema
+
+def get_raw_model(model: nn.Module) -> nn.Module:
+    """Devuelve el modelo sin wrapper de torch.compile."""
+    return model._orig_mod if hasattr(model, "_orig_mod") else model
 
 def get_raw_state_dict(model: nn.Module) -> dict:
     raw = model._orig_mod if hasattr(model, "_orig_mod") else model
