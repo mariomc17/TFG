@@ -6,6 +6,12 @@ import numpy as np
 import json
 from PIL import Image
 
+# MEJORA SOTA: Variables que requieren transformación logarítmica (log1p) 
+# antes de calcular el Z-score. Esto arregla la asimetría de los datos físicos.
+# De este modo tenemos una distribución más simétrica (próxima a una gaussiana)
+
+_LOG1P_VARS = frozenset({"EA", "ESCALA_KPC_PX", "RADIO_P"})
+
 
 class GalaxiasFisicasDataset(Dataset):
     def __init__(self, hdf5_path, img_size, variables_elegidas):
