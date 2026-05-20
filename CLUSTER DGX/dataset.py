@@ -114,13 +114,21 @@ class GalaxiasFisicasDataset(Dataset):
                 usable[var_name] = (err_std > 1e-6) and (err_std > 0.01 * err_mean)
         return usable
 
-    def __len__(self):
+def __len__(self) -> int:
         return self.length
 
-    def _normalize(self, value, name):
-        v_min = self.stats[name]['min']
-        v_max = self.stats[name]['max']
-        return (value - v_min) / (v_max - v_min + 1e-8)
+    def _normalize(self, value: float, var_name: str) -> float:
+        """Aplica la fórmula matemática para estandarizar el valor."""
+        s = self.norm_stats[var_name]
+        
+        value = float(np.clip(value, s["clip_lo"], s["clip_hi"]))
+        
+        if s["log_transform"]:
+            value = float(np.log1p(max(value, 0.0)))
+            
+        # MEJORA SOTA: fórmula del Z-Score: (x - media) / desviacion_estandar
+        # Sumamos 1e-8 para evitar nunca dividir por cero.
+        return (value - s["mean"]) / (s["std"] + 1e-8)
 
     def __getitem__(self, idx):
         if self.h5_file is None:
