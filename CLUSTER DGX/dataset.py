@@ -130,32 +130,39 @@ def __len__(self) -> int:
         # Sumamos 1e-8 para evitar nunca dividir por cero.
         return (value - s["mean"]) / (s["std"] + 1e-8)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
+        # Cada worker del DataLoader necesita su propio archivo HDF5 abierto
         if self.h5_file is None:
             self.h5_file = h5py.File(self.hdf5_path, 'r')
 
+        # 1. Extraer y transformar imagen
         img_np = self.h5_file['images'][idx]
         image = Image.fromarray(img_np)
         image = self.transform(image)
 
+        # 2. Extraer y procesar física
         phys_data = self.h5_file['fisica'][idx]
-
         vect_final = []
+
         for i, var_name in enumerate(self.variables_elegidas):
-            val = phys_data[self.indices_vars[i]]
+            val = float(phys_data[self.indices_vars[i]])
             idx_err = self.indices_errs[i]
 
-            if idx_err != -1:
-                err = phys_data[idx_err]
-                val = np.random.normal(loc=val, scale=err)
+            # MEJORA SOTA: solo sumamos error gaussiano si estamos en modo entrenamiento
+            # y si hemos comprobado antes que el error es real (no un placeholder constante)
+            if self.augment and self.use_err_aug[var_name] and idx_err != -1:
+                err = abs(float(phys_data[idx_err]))
+                if err > 0:
+                    val = float(np.random.normal(loc=val, scale=err))
 
+            # Normalizamos el valor definitivo
             val_norm = self._normalize(val, var_name)
             vect_final.append(val_norm)
 
         fisica_vector = torch.tensor(vect_final, dtype=torch.float32)
-        fisica_vector = torch.clamp(fisica_vector, 0.0, 1.0)
-
-        # rgb_np = self.h5_file['rgb'][idx]
-        # rgb_vector = torch.tensor(rgb_np, dtype=torch.float32)
+        
+        # MEJORA SOTA: clampeamos a ±3 desviaciones estándar. 
+        # Esto previene que una anomalía dispare los gradientes, pero respeta el Z-Score.
+        fisica_vector = torch.clamp(fisica_vector, -3.0, 3.0)
 
         return image, fisica_vector
