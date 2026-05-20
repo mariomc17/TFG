@@ -28,22 +28,28 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 class DataCfg:
     hdf5_path: str = "dataset_galaxias_sin_rgb.h5"
     img_size: int = 128
-    variables: List[str] = field(default_factory=lambda: [
-        'ESCALA_KPC_PX', 'LOG_MS', 'EA'])
+    # MEJORA SOTA: añadimos RADIO_P
+    variables: List[str] = field(
+        default_factory=lambda: ["ESCALA_KPC_PX", "LOG_MS", "EA", "RADIO_P"]
+    )
     num_workers: int = 4
-
+    augment: bool = True
 
 @dataclass
 class TrainCfg:
     batch_size: int = 32
-    epochs: int = 100
-    lr: float = 2e-4
+    epochs: int = 200 # Más épocas porque el proceso es más suave
+    lr: float = 1e-4  # Learning rate más bajo y estable
     save_every: int = 10
-    patience: int = 10
-    min_delta: float = 0.0
+    patience: int = 20
+    min_delta: float = 1e-5
     amp: bool = True
     compile: bool = True
-
+    dropout: float = 0.1
+    cfg_drop_prob: float = 0.15  
+    # MEJORA SOTA: hiperparámetros para la Media Móvil Exponencial (EMA)
+    ema_decay: float = 0.9999  
+    ema_warmup_steps: int = 1000
 
 @dataclass
 class ModelCfg:
@@ -52,11 +58,9 @@ class ModelCfg:
     embed_dim: int = 256
     time_dim: int = 256
 
-
 @dataclass
 class DiffusionCfg:
     num_train_timesteps: int = 1000
-
 
 @dataclass
 class Config:
@@ -65,21 +69,35 @@ class Config:
     model: ModelCfg = field(default_factory=ModelCfg)
     diffusion: DiffusionCfg = field(default_factory=DiffusionCfg)
 
-
-# =====================================================================
-# Módulo PhysicsProjector (se importa desde el script de generación).
-# =====================================================================
 class PhysicsProjector(nn.Module):
-    def __init__(self, input_dim, embed_dim=256):
+    def __init__(self, input_dim: int, embed_dim: int = 256):
         super().__init__()
+        # MEJORA SOTA: Null Tokens aprendibles en lugar de vectores a cero.
+        # Se inicializan con randn para simular la distribución Z-Score normal.
+        self.null_tokens = nn.Parameter(torch.randn(input_dim))
+
         self.net = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.GELU(),
-            nn.Linear(128, embed_dim), # Salida directa a embed_dim
+            nn.Linear(input_dim, 256),
+            nn.SiLU(),
+            nn.Linear(256, 256),
+            nn.SiLU(),
+            nn.Linear(256, embed_dim),
         )
 
-    def forward(self, x):
-        return self.net(x) # Forma final: [Batch, embed_dim]
+    def forward(self, x: torch.Tensor, drop_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        # Si estamos aplicando CFG (15% de las veces), sustituimos la física
+        # real por los "null tokens" aprendibles.
+        if drop_mask is not None and drop_mask.any():
+            null = self.null_tokens.unsqueeze(0).expand(x.shape[0], -1)
+            # torch.where: (condicion, valor_si_es_verdad, valor_si_es_falso)
+            x = torch.where(drop_mask[:, None], null, x)
+        return self.net(x)
+
+    @torch.no_grad()
+    def get_null_embedding(self, batch_size: int, device: torch.device) -> torch.Tensor:
+        """Extrae el token incondicional puro para la inferencia."""
+        null_vec = self.null_tokens.unsqueeze(0).expand(batch_size, -1).to(device)
+        return self.net(null_vec)
 
 
 # =====================================================================
