@@ -113,3 +113,125 @@ class Upsample(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(x, scale_factor=2.0, mode="nearest")
         return self.conv(x)
+
+# 5. U-Net Principal
+
+class CustomGalaxyUNet(nn.Module):
+    def __init__(self, n_channels: int = 3, n_classes: int = 3, embed_dim: int = 256, dropout: float = 0.1):
+        super().__init__()
+        D = embed_dim  # Dimensión del vector unificado (Física + Tiempo)
+
+        # Time embedding (Pasa de Dim a 4xDim por convención SOTA)
+        self.time_mlp = nn.Sequential(
+            SinusoidalEmbedding(D),
+            nn.Linear(D, D * 4),
+            nn.SiLU(),
+            nn.Linear(D * 4, D),
+        )
+
+        # ENCODER (Bajada)
+        self.inc = nn.Conv2d(n_channels, 128, 3, padding=1)
+        
+        self.enc0_a = ResBlock(128, 128, D, dropout=dropout)
+        self.enc0_b = ResBlock(128, 128, D, dropout=dropout)
+        self.enc0_dn = Downsample(128)
+
+        self.enc1_a = ResBlock(128, 256, D, dropout=dropout)
+        self.enc1_b = ResBlock(256, 256, D, dropout=dropout)
+        self.enc1_dn = Downsample(256)
+
+        self.enc2_a = ResBlock(256, 256, D, dropout=dropout)
+        self.enc2_b = ResBlock(256, 256, D, dropout=dropout)
+        self.enc2_dn = Downsample(256)
+
+        # L3: Aquí entra la Self-Attention (16x16)
+        self.enc3_a = ResBlock(256, 512, D, dropout=dropout)
+        self.enc3_sa1 = SelfAttentionBlock(512)
+        self.enc3_b = ResBlock(512, 512, D, dropout=dropout)
+        self.enc3_sa2 = SelfAttentionBlock(512)
+        self.enc3_dn = Downsample(512)
+
+        # CUELLO DE BOTELLA (Fondo de la 'U', 8x8)
+        self.mid_a = ResBlock(512, 512, D, dropout=dropout)
+        self.mid_sa = SelfAttentionBlock(512)
+        self.mid_b = ResBlock(512, 512, D, dropout=dropout)
+
+        # DECODER (Subida)
+        # En la subida, concatenamos el tensor actual con el "skip" de la bajada
+        self.dec3_up = Upsample(512)
+        self.dec3_a = ResBlock(512 + 512, 512, D, dropout=dropout) # 1024 -> 512
+        self.dec3_sa1 = SelfAttentionBlock(512)
+        self.dec3_b = ResBlock(512, 512, D, dropout=dropout)
+        self.dec3_sa2 = SelfAttentionBlock(512)
+
+        self.dec2_up = Upsample(512)
+        self.dec2_a = ResBlock(512 + 256, 256, D, dropout=dropout) # 768 -> 256
+        self.dec2_b = ResBlock(256, 256, D, dropout=dropout)
+
+        self.dec1_up = Upsample(256)
+        self.dec1_a = ResBlock(256 + 256, 256, D, dropout=dropout) # 512 -> 256
+        self.dec1_b = ResBlock(256, 256, D, dropout=dropout)
+
+        self.dec0_up = Upsample(256)
+        self.dec0_a = ResBlock(256 + 128, 128, D, dropout=dropout) # 384 -> 128
+        self.dec0_b = ResBlock(128, 128, D, dropout=dropout)
+
+        # OUTPUT
+        self.out_norm = nn.GroupNorm(32, 128)
+        self.outc = nn.Conv2d(128, n_classes, 1)
+
+    def forward(self, x: torch.Tensor, cond_emb: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
+        # MEJORA SOTA: Conditioning Unificado. Sumamos Física + Tiempo.
+        t = self.time_mlp(timesteps)
+        cond = t + cond_emb 
+
+        # Bajada
+        x0 = self.inc(x)
+        x0 = self.enc0_a(x0, cond)
+        x0 = self.enc0_b(x0, cond)
+
+        x1 = self.enc0_dn(x0)
+        x1 = self.enc1_a(x1, cond)
+        x1 = self.enc1_b(x1, cond)
+
+        x2 = self.enc1_dn(x1)
+        x2 = self.enc2_a(x2, cond)
+        x2 = self.enc2_b(x2, cond)
+
+        x3 = self.enc2_dn(x2)
+        x3 = self.enc3_a(x3, cond)
+        x3 = self.enc3_sa1(x3)
+        x3 = self.enc3_b(x3, cond)
+        x3 = self.enc3_sa2(x3)
+
+        # Fondo
+        xm = self.enc3_dn(x3)
+        xm = self.mid_a(xm, cond)
+        xm = self.mid_sa(xm)
+        xm = self.mid_b(xm, cond)
+
+        # Subida (Concatenando el Skip Connection)
+        h = self.dec3_up(xm)
+        h = torch.cat([h, x3], dim=1) 
+        h = self.dec3_a(h, cond)
+        h = self.dec3_sa1(h)
+        h = self.dec3_b(h, cond)
+        h = self.dec3_sa2(h)
+
+        h = self.dec2_up(h)
+        h = torch.cat([h, x2], dim=1)
+        h = self.dec2_a(h, cond)
+        h = self.dec2_b(h, cond)
+
+        h = self.dec1_up(h)
+        h = torch.cat([h, x1], dim=1)
+        h = self.dec1_a(h, cond)
+        h = self.dec1_b(h, cond)
+
+        h = self.dec0_up(h)
+        h = torch.cat([h, x0], dim=1)
+        h = self.dec0_a(h, cond)
+        h = self.dec0_b(h, cond)
+
+        # Salida
+        return self.outc(F.silu(self.out_norm(h)))
