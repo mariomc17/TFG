@@ -30,7 +30,7 @@ class GalaxiasFisicasDataset(Dataset):
             self.length = len(f['images'])
             self.columnas_fisicas = json.loads(f.attrs['columnas_fisicas'])
             
-            # MEJORA SOTA: Cargamos TODA la física en RAM de golpe (son pocos MB) 
+            # MEJORA SOTA: cargamos TODA la física en RAM de golpe (son pocos MB) 
             # para poder calcular nosotros mismos medias y desviaciones estándar robustas.
             fisica_all = f["fisica"][:] 
 
@@ -57,7 +57,7 @@ class GalaxiasFisicasDataset(Dataset):
         # Transformaciones de imagen (sin rombos) ──
         aug_transforms = []
         if self.augment:
-            # MEJORA SOTA: Las galaxias no tienen "arriba" o "abajo" en el espacio.
+            # MEJORA SOTA: las galaxias no tienen "arriba" o "abajo" en el espacio.
             # Voltearlas multiplica el dataset x4 gratis sin crear esquinas negras.
             aug_transforms = [
                 transforms.RandomHorizontalFlip(),
@@ -70,6 +70,49 @@ class GalaxiasFisicasDataset(Dataset):
             transforms.ToTensor(),
             transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]) # Normaliza imagen a [-1, 1]
         ])
+
+    def _compute_norm_stats(self, fisica_all: np.ndarray) -> dict:
+        """Calcula la media y desviación estándar de forma robusta."""
+        stats = {}
+        for var_name, idx in zip(self.variables_elegidas, self.indices_vars):
+            vals = fisica_all[:, idx].astype(np.float64)
+
+            # MEJORA SOTA: recortamos los outliers extremos. 
+            # Solo miramos el 99% central de los datos.
+            clip_lo, clip_hi = np.percentile(vals, [0.5, 99.5])
+            vals_clipped = np.clip(vals, clip_lo, clip_hi)
+
+            # Si la variable crece exponencialmente, aplicamos logaritmo
+            use_log = var_name in _LOG1P_VARS
+            if use_log:
+                vals_transformed = np.log1p(np.maximum(vals_clipped, 0.0))
+            else:
+                vals_transformed = vals_clipped
+
+            # Guardamos los estadísticos para usarlos en el entrenamiento y en la inferencia
+            stats[var_name] = {
+                "mean": float(np.mean(vals_transformed)),
+                "std": float(np.std(vals_transformed)),
+                "log_transform": use_log,
+                "clip_lo": float(clip_lo),
+                "clip_hi": float(clip_hi),
+            }
+        return stats
+
+    def _detect_usable_errors(self, fisica_all: np.ndarray) -> dict:
+        """Detecta si un error es real o un valor 'placeholder' del catálogo."""
+        usable = {}
+        for var_name, idx_err in zip(self.variables_elegidas, self.indices_errs):
+            if idx_err == -1:
+                usable[var_name] = False
+            else:
+                err_vals = fisica_all[:, idx_err].astype(np.float64)
+                err_std = np.std(err_vals)
+                err_mean = np.abs(np.mean(err_vals))
+                # MEJORA SOTA: si la desviación estándar del error es casi 0, 
+                # significa que es el mismo número para todas las galaxias. Lo descartamos.
+                usable[var_name] = (err_std > 1e-6) and (err_std > 0.01 * err_mean)
+        return usable
 
     def __len__(self):
         return self.length
