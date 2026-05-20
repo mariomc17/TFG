@@ -114,7 +114,7 @@ class GalaxiasFisicasDataset(Dataset):
                 usable[var_name] = (err_std > 1e-6) and (err_std > 0.01 * err_mean)
         return usable
 
-def __len__(self) -> int:
+    def __len__(self) -> int:
         return self.length
 
     def _normalize(self, value: float, var_name: str) -> float:
