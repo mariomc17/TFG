@@ -28,7 +28,7 @@ train:
   # Épocas sin mejora antes de parar por early stopping.
   patience: 20
   # Mejora mínima de loss requerida para resetear la paciencia.
-  min_delta: 1.0e-5
+  min_delta: 1.0e-6
   # Usa mixed precision en CUDA para reducir memoria y acelerar.
   amp: true
   # Compila la U-Net con torch.compile cuando hay CUDA.
