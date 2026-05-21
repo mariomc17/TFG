@@ -12,8 +12,8 @@ Mejoras respecto a la versión anterior:
     robustecidos mediante recorte al percentil 0.5–99.5 antes de calcular mean/std
   ✓ Detección automática de errores constantes (EA_ERR=1.5, MET_ERR=0.15):
     se omite el augmentation por error cuando el error es idéntico para todas las muestras
-  ✓ Augmentación de imagen: RandomHorizontalFlip + RandomVerticalFlip + RandomRotation(180°)
-    Las galaxias no tienen orientación preferida en el plano del cielo.
+  ✓ Augmentación de imagen: RandomHorizontalFlip + RandomVerticalFlip + Rotaciones(0, 90, 180, 270)
+    Las galaxias no tienen orientación preferida. Se usan múltiplos de 90° para evitar bordes vacíos/negros.
   ✓ Clamp post-normalización: [−3, +3] en lugar de [0, 1]
   ✓ norm_stats accesible como atributo para guardarlo en el checkpoint
 
@@ -116,11 +116,15 @@ class GalaxiasFisicasDataset(Dataset):
             aug_transforms = [
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
-                # RandomRotation rellena las esquinas con 0 (negro = fondo oscuro del cielo),
-                # coherente con el fondo real de las imágenes SDSS.
-                transforms.RandomRotation(
-                    degrees=180,
-                    interpolation=transforms.InterpolationMode.BILINEAR,
+                # Rotaciones discretas en múltiplos de 90 grados (0, 90, 180, 270).
+                # Al ser la imagen cuadrada, esto preserva los píxeles originales sin requerir relleno.
+                transforms.RandomChoice(
+                    [
+                        transforms.RandomRotation((0, 0)),
+                        transforms.RandomRotation((90, 90)),
+                        transforms.RandomRotation((180, 180)),
+                        transforms.RandomRotation((270, 270)),
+                    ]
                 ),
             ]
 
