@@ -11,15 +11,17 @@ Mejoras SOTA respecto a la versión anterior:
   ✓ Zero-init en proyecciones AdaGN y attention output: estabilidad en training inicial
   ✓ Conditioning unificado: time_emb + phys_emb (ADM, Dhariwal 2021)
 
-Canales por resolución para imagen 128×128:
-    128×128 → 128ch (L0)
-     64×64  → 256ch (L1)
-     32×32  → 256ch (L2)
-     16×16  → 512ch (L3) + SelfAttention
-      8×8   → 512ch (L4, cuello de botella) + SelfAttention
+Canales por resolución para imagen 512×512:
+    512×512 →  32ch (L0)
+    256×256 →  64ch (L1)
+    128×128 → 128ch (L2)
+     64×64  → 256ch (L3)
+     32×32  → 256ch (L4)
+     16×16  → 512ch (L5) + SelfAttention
+      8×8   → 512ch (L6, cuello de botella) + SelfAttention
 
 Firma del forward: (x, cond_emb, timesteps)
-    x         : [B, 3, 128, 128]  imagen con ruido
+    x         : [B, 3, 512, 512]  imagen con ruido
     cond_emb  : [B, embed_dim]    embedding físico del PhysicsProjector
     timesteps : [B]               timestep como entero
 """
@@ -241,12 +243,14 @@ class CustomGalaxyUNet(nn.Module):
     """
     U-Net de difusión SOTA para generación de galaxias espirales.
 
-    Arquitectura por resolución (imagen 128×128):
-        L0: 128×128, 128ch  — 2 ResBlocks
-        L1:  64×64, 256ch  — 2 ResBlocks
-        L2:  32×32, 256ch  — 2 ResBlocks
-        L3:  16×16, 512ch  — 2 ResBlocks + 2 SelfAttention
-        L4:   8×8, 512ch  — 2 ResBlocks + 1 SelfAttention  (cuello de botella)
+    Arquitectura por resolución (imagen 512×512):
+        L0: 512×512,  32ch  — 2 ResBlocks
+        L1: 256×256,  64ch  — 2 ResBlocks
+        L2: 128×128, 128ch  — 2 ResBlocks
+        L3:  64×64,  256ch  — 2 ResBlocks
+        L4:  32×32,  256ch  — 2 ResBlocks
+        L5:  16×16,  512ch  — 2 ResBlocks + 2 SelfAttention
+        L6:   8×8,   512ch  — 2 ResBlocks + 1 SelfAttention  (cuello de botella)
         Decoder simétrico con skip connections de U-Net
 
     Conditioning:
@@ -261,9 +265,15 @@ class CustomGalaxyUNet(nn.Module):
         n_classes: int = 3,
         embed_dim: int = 256,
         dropout: float = 0.1,
+        img_size: int = 512,
     ):
         super().__init__()
         D = embed_dim  # Dimensión del conditioning unificado
+        if img_size not in (128, 512):
+            raise ValueError(
+                f"CustomGalaxyUNet solo define topologías para img_size 128 o 512, no {img_size}."
+            )
+        self.img_size = img_size
 
         # ── Time embedding ────────────────────────────────────────────────
         # Sinusoidal → MLP con hidden dim 4×D (estándar DDPM)
@@ -274,29 +284,43 @@ class CustomGalaxyUNet(nn.Module):
             nn.Linear(D * 4, D),
         )
 
+        if self.img_size == 128:
+            self._init_legacy_128(n_channels, n_classes, D, dropout)
+            return
+
         # ── Encoder ──────────────────────────────────────────────────────
-        # L0: 128×128, 128ch
-        self.inc = nn.Conv2d(n_channels, 128, 3, padding=1)
-        self.enc0_a = ResBlock(128, 128, D, dropout=dropout)
-        self.enc0_b = ResBlock(128, 128, D, dropout=dropout)
-        self.enc0_dn = Downsample(128)
+        # L0: 512×512, 32ch. GN=16 evita grupos de un solo canal en 32ch.
+        self.inc = nn.Conv2d(n_channels, 32, 3, padding=1)
+        self.enc0_a = ResBlock(32, 32, D, num_groups=16, dropout=dropout)
+        self.enc0_b = ResBlock(32, 32, D, num_groups=16, dropout=dropout)
+        self.enc0_dn = Downsample(32)
 
-        # L1: 64×64, 128→256ch
-        self.enc1_a = ResBlock(128, 256, D, dropout=dropout)
-        self.enc1_b = ResBlock(256, 256, D, dropout=dropout)
-        self.enc1_dn = Downsample(256)
+        # L1: 256×256, 32→64ch
+        self.enc1_a = ResBlock(32, 64, D, num_groups=16, dropout=dropout)
+        self.enc1_b = ResBlock(64, 64, D, dropout=dropout)
+        self.enc1_dn = Downsample(64)
 
-        # L2: 32×32, 256ch
-        self.enc2_a = ResBlock(256, 256, D, dropout=dropout)
-        self.enc2_b = ResBlock(256, 256, D, dropout=dropout)
-        self.enc2_dn = Downsample(256)
+        # L2: 128×128, 64→128ch
+        self.enc2_a = ResBlock(64, 128, D, dropout=dropout)
+        self.enc2_b = ResBlock(128, 128, D, dropout=dropout)
+        self.enc2_dn = Downsample(128)
 
-        # L3: 16×16, 256→512ch + Self-Attention
-        self.enc3_a = ResBlock(256, 512, D, dropout=dropout)
-        self.enc3_sa1 = SelfAttentionBlock(512)
-        self.enc3_b = ResBlock(512, 512, D, dropout=dropout)
-        self.enc3_sa2 = SelfAttentionBlock(512)
-        self.enc3_dn = Downsample(512)
+        # L3: 64×64, 128→256ch
+        self.enc3_a = ResBlock(128, 256, D, dropout=dropout)
+        self.enc3_b = ResBlock(256, 256, D, dropout=dropout)
+        self.enc3_dn = Downsample(256)
+
+        # L4: 32×32, 256ch
+        self.enc4_a = ResBlock(256, 256, D, dropout=dropout)
+        self.enc4_b = ResBlock(256, 256, D, dropout=dropout)
+        self.enc4_dn = Downsample(256)
+
+        # L5: 16×16, 256→512ch + Self-Attention
+        self.enc5_a = ResBlock(256, 512, D, dropout=dropout)
+        self.enc5_sa1 = SelfAttentionBlock(512)
+        self.enc5_b = ResBlock(512, 512, D, dropout=dropout)
+        self.enc5_sa2 = SelfAttentionBlock(512)
+        self.enc5_dn = Downsample(512)
 
         # ── Cuello de botella: 8×8, 512ch ────────────────────────────────
         self.mid_a = ResBlock(512, 512, D, dropout=dropout)
@@ -304,31 +328,140 @@ class CustomGalaxyUNet(nn.Module):
         self.mid_b = ResBlock(512, 512, D, dropout=dropout)
 
         # ── Decoder ──────────────────────────────────────────────────────
-        # L3 up: 16×16 — cat(512 + skip_enc3[512]) = 1024 → 512
-        self.dec3_up = Upsample(512)
-        self.dec3_a = ResBlock(512 + 512, 512, D, dropout=dropout)
-        self.dec3_sa1 = SelfAttentionBlock(512)
-        self.dec3_b = ResBlock(512, 512, D, dropout=dropout)
-        self.dec3_sa2 = SelfAttentionBlock(512)
+        # L5 up: 16×16 — cat(512 + skip_enc5[512]) = 1024 → 512
+        self.dec5_up = Upsample(512)
+        self.dec5_a = ResBlock(512 + 512, 512, D, dropout=dropout)
+        self.dec5_sa1 = SelfAttentionBlock(512)
+        self.dec5_b = ResBlock(512, 512, D, dropout=dropout)
+        self.dec5_sa2 = SelfAttentionBlock(512)
 
-        # L2 up: 32×32 — cat(512 + skip_enc2[256]) = 768 → 256
-        self.dec2_up = Upsample(512)
-        self.dec2_a = ResBlock(512 + 256, 256, D, dropout=dropout)
-        self.dec2_b = ResBlock(256, 256, D, dropout=dropout)
+        # L4 up: 32×32 — cat(512 + skip_enc4[256]) = 768 → 256
+        self.dec4_up = Upsample(512)
+        self.dec4_a = ResBlock(512 + 256, 256, D, dropout=dropout)
+        self.dec4_b = ResBlock(256, 256, D, dropout=dropout)
 
-        # L1 up: 64×64 — cat(256 + skip_enc1[256]) = 512 → 256
-        self.dec1_up = Upsample(256)
-        self.dec1_a = ResBlock(256 + 256, 256, D, dropout=dropout)
-        self.dec1_b = ResBlock(256, 256, D, dropout=dropout)
+        # L3 up: 64×64 — cat(256 + skip_enc3[256]) = 512 → 256
+        self.dec3_up = Upsample(256)
+        self.dec3_a = ResBlock(256 + 256, 256, D, dropout=dropout)
+        self.dec3_b = ResBlock(256, 256, D, dropout=dropout)
 
-        # L0 up: 128×128 — cat(256 + skip_enc0[128]) = 384 → 128
-        self.dec0_up = Upsample(256)
-        self.dec0_a = ResBlock(256 + 128, 128, D, dropout=dropout)
-        self.dec0_b = ResBlock(128, 128, D, dropout=dropout)
+        # L2 up: 128×128 — cat(256 + skip_enc2[128]) = 384 → 128
+        self.dec2_up = Upsample(256)
+        self.dec2_a = ResBlock(256 + 128, 128, D, dropout=dropout)
+        self.dec2_b = ResBlock(128, 128, D, dropout=dropout)
+
+        # L1 up: 256×256 — cat(128 + skip_enc1[64]) = 192 → 64
+        self.dec1_up = Upsample(128)
+        self.dec1_a = ResBlock(128 + 64, 64, D, dropout=dropout)
+        self.dec1_b = ResBlock(64, 64, D, dropout=dropout)
+
+        # L0 up: 512×512 — cat(64 + skip_enc0[32]) = 96 → 32
+        self.dec0_up = Upsample(64)
+        self.dec0_a = ResBlock(64 + 32, 32, D, num_groups=16, dropout=dropout)
+        self.dec0_b = ResBlock(32, 32, D, num_groups=16, dropout=dropout)
 
         # ── Output ───────────────────────────────────────────────────────
+        self.out_norm = nn.GroupNorm(16, 32)
+        self.outc = nn.Conv2d(32, n_classes, 1)
+
+    def _init_legacy_128(
+        self,
+        n_channels: int,
+        n_classes: int,
+        cond_dim: int,
+        dropout: float,
+    ):
+        """Mantiene cargables los checkpoints 128 entrenados antes de los niveles nuevos."""
+        self.inc = nn.Conv2d(n_channels, 128, 3, padding=1)
+        self.enc0_a = ResBlock(128, 128, cond_dim, dropout=dropout)
+        self.enc0_b = ResBlock(128, 128, cond_dim, dropout=dropout)
+        self.enc0_dn = Downsample(128)
+
+        self.enc1_a = ResBlock(128, 256, cond_dim, dropout=dropout)
+        self.enc1_b = ResBlock(256, 256, cond_dim, dropout=dropout)
+        self.enc1_dn = Downsample(256)
+
+        self.enc2_a = ResBlock(256, 256, cond_dim, dropout=dropout)
+        self.enc2_b = ResBlock(256, 256, cond_dim, dropout=dropout)
+        self.enc2_dn = Downsample(256)
+
+        self.enc3_a = ResBlock(256, 512, cond_dim, dropout=dropout)
+        self.enc3_sa1 = SelfAttentionBlock(512)
+        self.enc3_b = ResBlock(512, 512, cond_dim, dropout=dropout)
+        self.enc3_sa2 = SelfAttentionBlock(512)
+        self.enc3_dn = Downsample(512)
+
+        self.mid_a = ResBlock(512, 512, cond_dim, dropout=dropout)
+        self.mid_sa = SelfAttentionBlock(512)
+        self.mid_b = ResBlock(512, 512, cond_dim, dropout=dropout)
+
+        self.dec3_up = Upsample(512)
+        self.dec3_a = ResBlock(512 + 512, 512, cond_dim, dropout=dropout)
+        self.dec3_sa1 = SelfAttentionBlock(512)
+        self.dec3_b = ResBlock(512, 512, cond_dim, dropout=dropout)
+        self.dec3_sa2 = SelfAttentionBlock(512)
+
+        self.dec2_up = Upsample(512)
+        self.dec2_a = ResBlock(512 + 256, 256, cond_dim, dropout=dropout)
+        self.dec2_b = ResBlock(256, 256, cond_dim, dropout=dropout)
+
+        self.dec1_up = Upsample(256)
+        self.dec1_a = ResBlock(256 + 256, 256, cond_dim, dropout=dropout)
+        self.dec1_b = ResBlock(256, 256, cond_dim, dropout=dropout)
+
+        self.dec0_up = Upsample(256)
+        self.dec0_a = ResBlock(256 + 128, 128, cond_dim, dropout=dropout)
+        self.dec0_b = ResBlock(128, 128, cond_dim, dropout=dropout)
+
         self.out_norm = nn.GroupNorm(32, 128)
         self.outc = nn.Conv2d(128, n_classes, 1)
+
+    def _forward_legacy_128(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        x0 = self.inc(x)
+        x0 = self.enc0_a(x0, cond)
+        x0 = self.enc0_b(x0, cond)
+
+        x1 = self.enc0_dn(x0)
+        x1 = self.enc1_a(x1, cond)
+        x1 = self.enc1_b(x1, cond)
+
+        x2 = self.enc1_dn(x1)
+        x2 = self.enc2_a(x2, cond)
+        x2 = self.enc2_b(x2, cond)
+
+        x3 = self.enc2_dn(x2)
+        x3 = self.enc3_a(x3, cond)
+        x3 = self.enc3_sa1(x3)
+        x3 = self.enc3_b(x3, cond)
+        x3 = self.enc3_sa2(x3)
+
+        xm = self.enc3_dn(x3)
+        xm = self.mid_a(xm, cond)
+        xm = self.mid_sa(xm)
+        xm = self.mid_b(xm, cond)
+
+        h = self.dec3_up(xm)
+        h = torch.cat([h, x3], dim=1)
+        h = self.dec3_a(h, cond)
+        h = self.dec3_sa1(h)
+        h = self.dec3_b(h, cond)
+        h = self.dec3_sa2(h)
+
+        h = self.dec2_up(h)
+        h = torch.cat([h, x2], dim=1)
+        h = self.dec2_a(h, cond)
+        h = self.dec2_b(h, cond)
+
+        h = self.dec1_up(h)
+        h = torch.cat([h, x1], dim=1)
+        h = self.dec1_a(h, cond)
+        h = self.dec1_b(h, cond)
+
+        h = self.dec0_up(h)
+        h = torch.cat([h, x0], dim=1)
+        h = self.dec0_a(h, cond)
+        h = self.dec0_b(h, cond)
+        return self.outc(F.silu(self.out_norm(h)))
 
     def forward(
         self,
@@ -349,53 +482,74 @@ class CustomGalaxyUNet(nn.Module):
         t = self.time_mlp(timesteps)  # [B, D]
         cond = t + cond_emb  # [B, D] — suma directa
 
+        if self.img_size == 128:
+            return self._forward_legacy_128(x, cond)
+
         # ── Encoder ──────────────────────────────────────────────────────
-        x0 = self.inc(x)  # [B, 128, 128, 128]
+        x0 = self.inc(x)  # [B, 32, 512, 512]
         x0 = self.enc0_a(x0, cond)
         x0 = self.enc0_b(x0, cond)  # skip L0
 
-        x1 = self.enc0_dn(x0)  # [B, 128,  64,  64]
-        x1 = self.enc1_a(x1, cond)  # 128→256ch
-        x1 = self.enc1_b(x1, cond)  # skip L1 (256ch)
+        x1 = self.enc0_dn(x0)  # [B, 32, 256, 256]
+        x1 = self.enc1_a(x1, cond)  # 32→64ch
+        x1 = self.enc1_b(x1, cond)  # skip L1 (64ch)
 
-        x2 = self.enc1_dn(x1)  # [B, 256,  32,  32]
-        x2 = self.enc2_a(x2, cond)
-        x2 = self.enc2_b(x2, cond)  # skip L2 (256ch)
+        x2 = self.enc1_dn(x1)  # [B, 64, 128, 128]
+        x2 = self.enc2_a(x2, cond)  # 64→128ch
+        x2 = self.enc2_b(x2, cond)  # skip L2 (128ch)
 
-        x3 = self.enc2_dn(x2)  # [B, 256,  16,  16]
-        x3 = self.enc3_a(x3, cond)  # 256→512ch
-        x3 = self.enc3_sa1(x3)
-        x3 = self.enc3_b(x3, cond)
-        x3 = self.enc3_sa2(x3)  # skip L3 (512ch)
+        x3 = self.enc2_dn(x2)  # [B, 128, 64, 64]
+        x3 = self.enc3_a(x3, cond)  # 128→256ch
+        x3 = self.enc3_b(x3, cond)  # skip L3 (256ch)
+
+        x4 = self.enc3_dn(x3)  # [B, 256, 32, 32]
+        x4 = self.enc4_a(x4, cond)
+        x4 = self.enc4_b(x4, cond)  # skip L4 (256ch)
+
+        x5 = self.enc4_dn(x4)  # [B, 256, 16, 16]
+        x5 = self.enc5_a(x5, cond)  # 256→512ch
+        x5 = self.enc5_sa1(x5)
+        x5 = self.enc5_b(x5, cond)
+        x5 = self.enc5_sa2(x5)  # skip L5 (512ch)
 
         # ── Cuello de botella ─────────────────────────────────────────────
-        xm = self.enc3_dn(x3)  # [B, 512,   8,   8]
+        xm = self.enc5_dn(x5)  # [B, 512, 8, 8]
         xm = self.mid_a(xm, cond)
         xm = self.mid_sa(xm)
         xm = self.mid_b(xm, cond)
 
         # ── Decoder ──────────────────────────────────────────────────────
-        h = self.dec3_up(xm)  # [B,  512, 16, 16]
-        h = torch.cat([h, x3], dim=1)  # [B, 1024, 16, 16]
-        h = self.dec3_a(h, cond)  # 1024→512ch
-        h = self.dec3_sa1(h)
-        h = self.dec3_b(h, cond)
-        h = self.dec3_sa2(h)
+        h = self.dec5_up(xm)  # [B, 512, 16, 16]
+        h = torch.cat([h, x5], dim=1)  # [B, 1024, 16, 16]
+        h = self.dec5_a(h, cond)  # 1024→512ch
+        h = self.dec5_sa1(h)
+        h = self.dec5_b(h, cond)
+        h = self.dec5_sa2(h)
 
-        h = self.dec2_up(h)  # [B,  512, 32, 32]
-        h = torch.cat([h, x2], dim=1)  # [B,  768, 32, 32]
-        h = self.dec2_a(h, cond)  # 768→256ch
+        h = self.dec4_up(h)  # [B, 512, 32, 32]
+        h = torch.cat([h, x4], dim=1)  # [B, 768, 32, 32]
+        h = self.dec4_a(h, cond)  # 768→256ch
+        h = self.dec4_b(h, cond)
+
+        h = self.dec3_up(h)  # [B, 256, 64, 64]
+        h = torch.cat([h, x3], dim=1)  # [B, 512, 64, 64]
+        h = self.dec3_a(h, cond)  # 512→256ch
+        h = self.dec3_b(h, cond)
+
+        h = self.dec2_up(h)  # [B, 256, 128, 128]
+        h = torch.cat([h, x2], dim=1)  # [B, 384, 128, 128]
+        h = self.dec2_a(h, cond)  # 384→128ch
         h = self.dec2_b(h, cond)
 
-        h = self.dec1_up(h)  # [B,  256, 64, 64]
-        h = torch.cat([h, x1], dim=1)  # [B,  512, 64, 64]
-        h = self.dec1_a(h, cond)  # 512→256ch
+        h = self.dec1_up(h)  # [B, 128, 256, 256]
+        h = torch.cat([h, x1], dim=1)  # [B, 192, 256, 256]
+        h = self.dec1_a(h, cond)  # 192→64ch
         h = self.dec1_b(h, cond)
 
-        h = self.dec0_up(h)  # [B,  256, 128, 128]
-        h = torch.cat([h, x0], dim=1)  # [B,  384, 128, 128]
-        h = self.dec0_a(h, cond)  # 384→128ch
+        h = self.dec0_up(h)  # [B, 64, 512, 512]
+        h = torch.cat([h, x0], dim=1)  # [B, 96, 512, 512]
+        h = self.dec0_a(h, cond)  # 96→32ch
         h = self.dec0_b(h, cond)
 
         # ── Output ───────────────────────────────────────────────────────
-        return self.outc(F.silu(self.out_norm(h)))  # [B, 3, 128, 128]
+        return self.outc(F.silu(self.out_norm(h)))  # [B, 3, 512, 512]
