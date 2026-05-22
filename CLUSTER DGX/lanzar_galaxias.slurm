@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=slurmuser
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=20
 #SBATCH --mem=64G
 #SBATCH --partition=dgx
 #SBATCH --gres=gpu:4
