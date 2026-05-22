@@ -67,7 +67,8 @@ class GenConfig:
     # Si es null, submit_gen.sh lo pasa como override checkpoint=/ruta/al/ckpt.pt.
     checkpoint: Optional[str] = None
     output_dir: Optional[str] = None
-    img_size: int = 128
+    # None usa el tamaño guardado en el checkpoint de entrenamiento.
+    img_size: Optional[int] = None
     inference_steps: int = 50
     guidance_scale: float = 7.5
     mode: str = "examples"
@@ -164,7 +165,7 @@ def generate_galaxy(
     device: torch.device,
     guidance_scale: float = 7.5,
     seed: Optional[int] = None,
-    img_size: int = 128,
+    img_size: int = 512,
 ) -> torch.Tensor:
     """
     Genera una galaxia con DDIM y CFG.
@@ -239,7 +240,7 @@ def generate_galaxies_batch(
     device: torch.device,
     guidance_scale: float = 7.5,
     seed: Optional[int] = None,
-    img_size: int = 128,
+    img_size: int = 512,
 ) -> List[torch.Tensor]:
     """
     Genera N galaxias en una sola pasada batched por el UNet.
@@ -393,7 +394,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
     ya que el EMA produce imágenes de mayor calidad.
 
     Returns:
-        unet, projector, noise_scheduler, variables, norm_stats
+        unet, projector, noise_scheduler, variables, norm_stats, train_img_size
     """
     print(f"Cargando checkpoint: {ckpt_path}")
     checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -415,6 +416,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
     model_cfg = cfg_dict.get("model", {})
     embed_dim = model_cfg.get("embed_dim", 256)
     dropout = cfg_dict.get("train", {}).get("dropout", 0.0)
+    train_img_size = cfg_dict.get("data", {}).get("img_size", 128)
 
     # ── U-Net (pesos EMA) ─────────────────────────────────────────────────
     unet = CustomGalaxyUNet(
@@ -422,6 +424,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
         n_classes=model_cfg.get("n_classes", 3),
         embed_dim=embed_dim,
         dropout=dropout,  # dropout=0 en inferencia; nn.Dropout lo maneja con eval()
+        img_size=train_img_size,
     ).to(device)
 
     unet.load_state_dict(checkpoint["unet_ema"])
@@ -448,7 +451,7 @@ def load_checkpoint(ckpt_path: str, device: torch.device):
         timestep_spacing="trailing",
     )
 
-    return unet, projector, noise_scheduler, variables, norm_stats
+    return unet, projector, noise_scheduler, variables, norm_stats, train_img_size
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -769,15 +772,6 @@ def main():
     cfg = resolve_config(args, overrides)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    os.makedirs(cfg.output_dir, exist_ok=True)
-    parent_dir = (
-        os.path.dirname(cfg.output_dir)
-        if os.path.basename(cfg.output_dir) == "images"
-        else cfg.output_dir
-    )
-    os.makedirs(parent_dir, exist_ok=True)
-    OmegaConf.save(cfg, os.path.join(parent_dir, "config_used.yaml"))
-
     print("=" * 70)
     print(f"Dispositivo: {device}")
     print(f"Config:      {args.config}")
@@ -790,9 +784,20 @@ def main():
     print(f"Guidance:    {cfg.guidance_scale}")
     print("=" * 70)
 
-    unet, projector, noise_scheduler, variables, norm_stats = load_checkpoint(
-        cfg.checkpoint, device
+    unet, projector, noise_scheduler, variables, norm_stats, train_img_size = (
+        load_checkpoint(cfg.checkpoint, device)
     )
+    if cfg.img_size is None:
+        cfg.img_size = train_img_size
+
+    os.makedirs(cfg.output_dir, exist_ok=True)
+    parent_dir = (
+        os.path.dirname(cfg.output_dir)
+        if os.path.basename(cfg.output_dir) == "images"
+        else cfg.output_dir
+    )
+    os.makedirs(parent_dir, exist_ok=True)
+    OmegaConf.save(cfg, os.path.join(parent_dir, "config_used.yaml"))
 
     # Configurar número de pasos DDIM
     noise_scheduler.set_timesteps(cfg.inference_steps)
