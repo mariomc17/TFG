@@ -17,6 +17,7 @@ CONFIG ?= configs/train_baseline.yaml
 GEN_CONFIG ?= configs/gen_examples.yaml
 CKPT   ?=
 EXTRA  ?=
+TRAIN_GPUS ?= 4
 
 # Parámetros SLURM para comandos interactivos/cortos que necesitan Docker/GPU.
 # Se usan en build, shell, show-config y monitorización.
@@ -46,6 +47,7 @@ help: ## Muestra esta ayuda
 	@printf "  $(Y)GEN_CONFIG$(R)  YAML de generación               (default: $(GEN_CONFIG))\n"
 	@printf "  $(Y)CKPT$(R)        checkpoint para gen              (default: autodescubre)\n"
 	@printf "  $(Y)EXTRA$(R)       overrides OmegaConf, entre comillas\n"
+	@printf "  $(Y)TRAIN_GPUS$(R)  GPUs del job train / torchrun     (default: $(TRAIN_GPUS))\n"
 	@printf "\n$(B)Variables SLURM/Docker:$(R)\n"
 	@printf "  $(Y)PARTITION$(R)   partición SLURM                  (default: $(PARTITION))\n"
 	@printf "  $(Y)ACCOUNT$(R)     cuenta SLURM                     (default: $(ACCOUNT))\n"
@@ -97,7 +99,7 @@ build-local: ## Construye la imagen Docker en el nodo local (solo si cambiaron l
 	 fi
 
 train: ## Lanza un entrenamiento por SLURM
-	@./submit_train.sh "$(TAG)" "$(CONFIG)" $(EXTRA)
+	@TRAIN_GPUS="$(TRAIN_GPUS)" ./submit_train.sh "$(TAG)" "$(CONFIG)" $(EXTRA)
 
 gen: ## Genera galaxias por SLURM; usa el último ckpt si no se da CKPT
 	@./submit_gen.sh "$(CKPT)" "$(GEN_CONFIG)" $(EXTRA)
@@ -251,4 +253,3 @@ htop: ## Abre htop dentro del nodo del job, si está instalado; si no, cae a top
 	[ -n "$$job" ] || { echo "No encuentro ningún job RUNNING de $$USER. Usa make status o JOB=<id>."; exit 1; }; \
 	echo "Monitor CPU/RAM en job $$job; pulsa q o Ctrl-C para salir"; \
 	srun --jobid=$$job --overlap --pty bash -lc 'hostname; if command -v htop >/dev/null 2>&1; then htop; else echo "htop no está instalado; usando top."; top; fi'
-	

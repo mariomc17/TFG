@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=slurmuser
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --partition=dgx
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 #SBATCH --time=1-23:00:00
 # --job-name, --output y --error los inyecta submit_train.sh
 
@@ -18,6 +18,7 @@ echo "================================================================"
 echo "Job:        ${SLURM_JOB_ID}"
 echo "Tag:        ${RUN_TAG}"
 echo "Config:     ${CONFIG_PATH}"
+echo "GPUs:       ${TRAIN_GPUS:-4}"
 [ -n "${OVERRIDES:-}" ] && echo "Overrides:  ${OVERRIDES}"
 echo "Host:       $(hostname)"
 echo "Inicio:     $(date)"
@@ -59,6 +60,7 @@ fi
 # Traducir ruta de RUN_DIR del host al interior del contenedor
 RUN_DIR_IN_CONT="/app/${RUN_DIR#$R/}"
 GPU_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
+NPROC_PER_NODE="${TRAIN_GPUS:-4}"
 
 echo "Lanzando el entrenamiento..."
 docker run --gpus "device=${GPU_DEVICES}" --name $NOMBRECONT --rm \
@@ -72,6 +74,6 @@ docker run --gpus "device=${GPU_DEVICES}" --name $NOMBRECONT --rm \
   -e RUN_DIR="${RUN_DIR_IN_CONT}" \
   -u $(id -u):$(id -g) \
   -v "$R":/app \
-  galaxias-ml /bin/bash -c "python train_diffusion_mi_u_net.py --config '${CONFIG_PATH}' ${OVERRIDES:-}"
+  galaxias-ml /bin/bash -c "torchrun --standalone --nproc_per_node='${NPROC_PER_NODE}' train_diffusion_mi_u_net.py --config '${CONFIG_PATH}' ${OVERRIDES:-}"
 
 echo "Trabajo finalizado a las $(date)"

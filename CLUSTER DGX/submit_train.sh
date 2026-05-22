@@ -9,6 +9,8 @@
 #   CONFIG    YAML de configuración    (default: configs/train_baseline.yaml)
 #   OVERRIDES Pares clave=valor estilo OmegaConf, opcionales
 #             ej.: train.lr=5e-5 train.batch_size=64
+# Entorno:
+#   TRAIN_GPUS GPU del job y procesos torchrun por nodo (default: 4)
 #
 # Ejemplos:
 #   ./submit_train.sh
@@ -21,6 +23,7 @@ TAG="${1:-baseline}"
 CONFIG="${2:-configs/train_baseline.yaml}"
 shift 2 2>/dev/null || shift $# || true
 OVERRIDES="$*"   # resto de argumentos como string
+TRAIN_GPUS="${TRAIN_GPUS:-4}"
 
 if [ ! -f "$CONFIG" ]; then
   echo "ERROR: no existe el config '$CONFIG'"
@@ -35,11 +38,13 @@ mkdir -p "${RUN_DIR_TMP}/logs" "${RUN_DIR_TMP}/checkpoints"
 echo "Preparando run:"
 echo "  Carpeta:    ${RUN_DIR_TMP}"
 echo "  Config:     ${CONFIG}"
+echo "  GPUs:       ${TRAIN_GPUS}"
 [ -n "$OVERRIDES" ] && echo "  Overrides:  ${OVERRIDES}"
 
 sbatch \
+  --gres="gpu:${TRAIN_GPUS}" \
   --job-name="${TAG}" \
   --output="${RUN_DIR_TMP}/logs/train.out" \
   --error="${RUN_DIR_TMP}/logs/train.err" \
-  --export=ALL,RUN_DIR_TMP="${RUN_DIR_TMP}",RUN_TAG="${TAG}",RUN_TS="${TIMESTAMP}",CONFIG_PATH="${CONFIG}",OVERRIDES="${OVERRIDES}" \
+  --export=ALL,RUN_DIR_TMP="${RUN_DIR_TMP}",RUN_TAG="${TAG}",RUN_TS="${TIMESTAMP}",CONFIG_PATH="${CONFIG}",OVERRIDES="${OVERRIDES}",TRAIN_GPUS="${TRAIN_GPUS}" \
   lanzar_galaxias.slurm
