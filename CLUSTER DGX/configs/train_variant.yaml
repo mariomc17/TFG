@@ -1,9 +1,10 @@
 # configs/train_variant.yaml
-# Variante: learning rate más agresivo, batch mayor, menos épocas.
+# Variante: learning rate más agresivo y menos épocas.
 # Lo no especificado se hereda de los defaults.
 
 train:
-  batch_size: 64
+  # Batch local por GPU; con 4 GPU el batch global efectivo es 64.
+  batch_size: 16
   epochs: 60
   lr: 5.0e-4
   save_every: 10

@@ -8,7 +8,7 @@ data:
   # Ruta al dataset HDF5 montado dentro del contenedor.
   hdf5_path: dataset_galaxias_sin_rgb.h5
   # Tamaño cuadrado al que se redimensionan las imágenes de entrada.
-  img_size: 128
+  img_size: 512
   # Variables físicas usadas como condicionamiento, en este orden.
   variables: [ESCALA_KPC_PX, LOG_MS, EA, RADIO_P]
   # Procesos paralelos del DataLoader para cargar batches.
@@ -17,12 +17,16 @@ data:
   augment: true
 
 train:
-  # Número de galaxias por batch de entrenamiento.
-  batch_size: 32
+  # Batch local por GPU; con 4 GPU el batch global efectivo es 64.
+  batch_size: 16
   # Número máximo de épocas.
   epochs: 200
-  # Learning rate del optimizador AdamW.
+  # Learning rate base por GPU del optimizador AdamW.
   lr: 1.0e-4
+  # Multiplica el learning rate base por world_size cuando se usa DDP.
+  scale_lr_by_world_size: true
+  # Warmup lineal del learning rate efectivo en pasos de optimizador.
+  lr_warmup_steps: 1000
   # Guarda checkpoint periódico cada N épocas.
   save_every: 20
   # Épocas sin mejora antes de parar por early stopping.
