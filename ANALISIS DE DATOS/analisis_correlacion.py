@@ -6,7 +6,7 @@ import seaborn as plt_sns
 from tqdm import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV_SDSS = os.path.join(DIR_CSV, "galaxias_sdss.csv")
 
@@ -63,20 +63,21 @@ def estudio_correlacion_estocastica(df, pbar):
         kind="hist",           
         diag_kind="kde",       
         corner=True,
-        height=5,
-        aspect=1,
+        height=2.5,
+        aspect=1.1,
     )
     
-    pair_plot.fig.suptitle("Análisis distribucional multidimensional de variables astrofísicas", y=0.98, fontsize=18)
-    
-    pair_plot.fig.subplots_adjust(top=0.99, bottom=0.1, left=0.1, right=0.95, wspace=0.1, hspace=0.1)
+    pair_plot.fig.suptitle("Análisis distribucional multidimensional de variables astrofísicas", y=0.96, fontsize=18)
     
     for ax in pair_plot.axes.flatten():
         if ax is not None:
-            ax.tick_params(axis='x', rotation=45)
-            ax.xaxis.label.set_size(10)
-            ax.yaxis.label.set_size(10)
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+            ax.xaxis.label.set_size(11)
+            ax.yaxis.label.set_size(11)
+            ax.tick_params(labelsize=9)
             
+    pair_plot.fig.subplots_adjust(top=0.90, bottom=0.12, left=0.12, right=0.96, wspace=0.22, hspace=0.22)
+    
     plt.show()
     pbar.update(1)
 
