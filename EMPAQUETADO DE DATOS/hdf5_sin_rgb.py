@@ -7,8 +7,9 @@ import json
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 CSV_FISICA = os.path.join(DIR_CSV, "galaxias_sdss.csv")
 DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_elipse") 
@@ -25,6 +26,7 @@ COLUMNAS_FISICAS = [
 ]
 
 IMG_SIZE = 512
+
 ###########################################################################################
 
 def main():
@@ -44,8 +46,6 @@ def main():
     if not validas:
         ejemplo = os.path.join(DIR_IMAGENES, f"{df_crudo.iloc[0]['OBJID']}.png")
         print(f"Error: no se encontraron imágenes válidas.")
-        print(f"El script ha intentado buscar, por ejemplo: {ejemplo}")
-        print("Comprueba si la carpeta es correcta")
         return
 
     df = pd.DataFrame(validas).reset_index(drop=True)
@@ -75,8 +75,6 @@ def main():
             
             vals_fisicos = [max(0.0, float(row[col])) if 'ERR' in col else float(row[col]) for col in columnas_presentes]
             dset_phys[i] = vals_fisicos
-
-    print(f"HDF5 creado con éxito. Tamaño: {os.path.getsize(HDF5_SALIDA) / (1024**3):.2f} GB")
-
+            
 if __name__ == "__main__":
     main()
