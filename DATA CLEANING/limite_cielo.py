@@ -8,9 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss") # Aquí ya se han filtrado las defectuosas
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 NOMBRE_CSV = "estadisticas_cielo.csv"
 CSV_PATH = os.path.join(DIR_CSV, NOMBRE_CSV)
@@ -19,6 +20,7 @@ if not os.path.exists(DIR_CSV):
     os.makedirs(DIR_CSV)
 
 MAX_WORKERS = 8
+
 ###########################################################################################
 
 def analizar_cielo(file):
@@ -27,7 +29,7 @@ def analizar_cielo(file):
         obj_id = os.path.basename(file).split(".")[0] 
         
         img = Image.open(img_path)
-        img_array = np.array(img).astype(float) 
+        img_array = np.array(img).astype(float) \
         
         brightness = img_array.sum(axis=2) 
         h, w = brightness.shape 
@@ -116,22 +118,27 @@ def main():
         df_cielo.to_csv(CSV_PATH, index=False)
         print(f"Archivo generado en: {CSV_PATH}")
         
+        T_SUPERTITULO = 19
+        T_EJES = 14.5
+        T_TICKS_LEYENDA = 13
+
         plt.figure(figsize=(10, 6))
         
         plt.hist(df_cielo['LC_Bruto'], bins=80, range=(0, 600), color='indianred', 
-                 edgecolor='darkred', alpha=0.6, label='$LC_{bruto}$ (Sin filtro de Tukey)')
+                 edgecolor='darkred', alpha=0.6, label='$LC_{bruto}$ (Sin filtro de Tukey)', zorder=3)
         
         plt.hist(df_cielo['LC_Final'], bins=80, range=(0, 600), color='mediumseagreen', 
-                 edgecolor='darkgreen', alpha=0.8, label='$LC_{final}$ (Con filtro de Tukey)')
+                 edgecolor='darkgreen', alpha=0.8, label='$LC_{final}$ (Con filtro de Tukey)', zorder=3)
         
-        plt.title('Comparativa de estimadores del Límite de Cielo ($LC$)', fontsize=16, pad=15)
-        plt.xlabel('Intensidad lumínica umbral ($LC$)', fontsize=12)
-        plt.ylabel('Número de galaxias', fontsize=12)
+        plt.title('Comparativa de estimadores del Límite de Cielo ($LC$)', fontsize=T_SUPERTITULO)
+        plt.xlabel('Intensidad ($LC$)', fontsize=T_EJES)
+        plt.ylabel('Número de galaxias', fontsize=T_EJES)
 
-        plt.xlim(50,400)
+        plt.xlim(50, 400)
         
-        plt.grid(axis='y', linestyle='--', alpha=0.6)
-        plt.legend(fontsize=12, loc='upper right')
+        plt.grid(axis='y', linestyle=':', color='gray', linewidth=0.7, alpha=0.7, zorder=1)
+        plt.tick_params(axis='both', labelsize=T_TICKS_LEYENDA)
+        plt.legend(fontsize=T_TICKS_LEYENDA, loc='upper right')
                 
         plt.tight_layout()
         plt.show()
