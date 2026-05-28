@@ -3,16 +3,17 @@ import matplotlib.pyplot as plt
 import os
 import sys
 
-# ══════════════════════════════════════════════════════════════════════════
+###########################################################################################
+
 ruta_actual = os.path.dirname(os.path.abspath(__file__))
-ruta_csv = os.path.abspath(os.path.join(ruta_actual, "..", "..", "entrenamiento", "metrics.csv"))
-# ══════════════════════════════════════════════════════════════════════════
+ruta_csv = os.path.abspath(os.path.join(ruta_actual, "..\..", "entrenamiento", "metrics.csv"))
+
+###########################################################################################
 
 def plotear_metricas():
     if not os.path.exists(ruta_csv):
-        print(f"No se encuentra el archivo en la ruta esperada:")
-        print(f"{ruta_csv}")
-        print("Por favor, verifica que la estructura de carpetas es correcta.")
+        print(f"No se encuentra el archivo en la ruta.")
+
         return
 
     df = pd.read_csv(ruta_csv)

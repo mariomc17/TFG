@@ -4,24 +4,24 @@ import torch
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
-# --- 1. AJUSTE DE RUTAS ---
+###########################################################################################
+
 ruta_actual = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 ruta_cluster = os.path.abspath(os.path.join(ruta_actual, "..", "CLUSTER DGX"))
 sys.path.append(ruta_cluster)
 
+###########################################################################################
+
 from generar_galaxia_mi_u_net import load_checkpoint, generate_galaxy, GalaxySpec, tensor_to_pil
 
-# --- 2. RUTAS Y PARÁMETROS EXACTOS DEL YAML ---
 RUTA_CHECKPOINT = os.path.expanduser("~/Downloads/mejor_modelo.pt")
 IMG_SIZE = 128
 INFERENCE_STEPS = 100
 GUIDANCE_SCALE = 3.0
 SEED = 42
 
-# NUEVA CONFIGURACIÓN: Sincronizado con el tamaño de fuente optimizado de plotear_galaxias
 TAMANO_FUENTE_PANORAMICA = 8.5
 
-# --- 3. LOS 12 ESCENARIOS ---
 escenarios = [
     {"id": "01 Típica mediana",            "p": [0.9, 10.2, 1.4, 9.0]}, # "0.9 (media) / 10.2 (media) / 1.4 (media) / 9.0 (media)"
     {"id": "02 Baja masa compacta",       "p": [0.65, 9.2, 0.7, 6.0]}, # "1.0 (media) / 9.2 (pequeña) / 0.7 (azul) / 6.0 (pequeña)"
@@ -37,8 +37,6 @@ escenarios = [
     {"id": "12 Incondicional",             "p": [None, None, None, None]}
 ]
 
-
-# --- 4. FUNCIÓN DE ANOTACIÓN ---
 def annotate_image(image, text, fill_color=(255, 255, 255), font_size=TAMANO_FUENTE_PANORAMICA):
     width, height = image.size
     
@@ -67,13 +65,10 @@ def annotate_image(image, text, fill_color=(255, 255, 255), font_size=TAMANO_FUE
     
     return new_image, (width, height + bar_height)
 
-# --- 5. FUNCIÓN PARA CREAR EL MOSAICO REESTRUCTURADO (2x6) ---
 def crear_mosaico_matriz(lista_escenarios, unet, projector, noise_scheduler, variables, norm_stats, device):
-    # Forzamos la reconfiguración estricta a 2 filas por 6 columnas
     columnas = 6
     filas = 2
     
-    # Simulación base con el tamaño de fuente corregido para medir el lienzo sin clipping
     sample_spec = GalaxySpec(etiqueta="sample", escala_kpc_px=0.5, log_ms=10, ea_gyr=1, radio_p_arcsec=10)
     sample_tensor = generate_galaxy(spec=sample_spec, unet=unet, projector=projector, noise_scheduler=noise_scheduler, variables=variables, norm_stats=norm_stats, device=device, guidance_scale=GUIDANCE_SCALE, seed=SEED, img_size=IMG_SIZE)
     sample_img = tensor_to_pil(sample_tensor)
@@ -93,7 +88,6 @@ def crear_mosaico_matriz(lista_escenarios, unet, projector, noise_scheduler, var
             radio_p_arcsec=esc['p'][3]
         )
         
-        # Selección del pipeline de inferencia condicionado vs incondicionado
         if esc['id'] == "12 Incondicional":
             tensor = generate_galaxy(
                 spec=spec, unet=unet, projector=projector, noise_scheduler=noise_scheduler,
@@ -109,7 +103,6 @@ def crear_mosaico_matriz(lista_escenarios, unet, projector, noise_scheduler, var
         
         imagen_cruda = tensor_to_pil(tensor)
         
-        # Formatear la cadena de texto limpia
         if esc['id'] == "12 Incondicional":
             texto_etiqueta = f"ID: {num_id}\nIncondicional"
         else:
@@ -117,7 +110,6 @@ def crear_mosaico_matriz(lista_escenarios, unet, projector, noise_scheduler, var
             linea_2 = f"E:{esc['p'][0]} M:{esc['p'][1]} EA:{esc['p'][2]} R:{esc['p'][3]}"
             texto_etiqueta = f"{linea_1}\n{linea_2}"
             
-        # Forzar el dibujado con la tipografía pequeña controlada
         imagen_anotada, _ = annotate_image(imagen_cruda, texto_etiqueta, fill_color=(255, 255, 255), font_size=TAMANO_FUENTE_PANORAMICA)
 
         col = i % columnas
@@ -126,24 +118,18 @@ def crear_mosaico_matriz(lista_escenarios, unet, projector, noise_scheduler, var
 
     return mosaico_img
 
-# --- 6. PROCESAMIENTO PRINCIPAL ---
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Iniciando entorno en {device} para la matriz estructural completa...")
     
     unet, projector, noise_scheduler, variables, norm_stats = load_checkpoint(RUTA_CHECKPOINT, device)
     noise_scheduler.set_timesteps(INFERENCE_STEPS)
 
-    print("\n[PROCESANDO] Generando matriz panorámica de 2x6 escenarios galácticos...")
     mosaico_final = crear_mosaico_matriz(escenarios, unet, projector, noise_scheduler, variables, norm_stats, device)
     
-    # Guardar matriz física resultante
     ruta_salida = os.path.join(ruta_actual, "matriz_escenarios_2x6.png")
     mosaico_final.save(ruta_salida)
-    print(f"[ÉXITO] Matriz compacta exportada correctamente en:\n-> {ruta_salida}")
 
-    # Ventana de visualización con estética panorámica adaptada a las nuevas dimensiones
-    plt.figure(figsize=(18, 7), facecolor='#121212') 
+    plt.figure(figsize=(18, 7), facecolor="#000000") 
     plt.imshow(mosaico_final)
     plt.title(f"", color='white', fontsize=14, pad=15)
     plt.axis('off')
