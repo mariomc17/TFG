@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_filtradas")
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 NOMBRE_CSV = "estadisticas_cielo.csv"
 CSV_PATH = os.path.join(DIR_CSV, NOMBRE_CSV)

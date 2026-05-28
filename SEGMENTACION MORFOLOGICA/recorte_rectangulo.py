@@ -9,17 +9,26 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss") # Aquí ya se han filtrado las defectuosas
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_filtradas")
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV = os.path.join(DIR_CSV, "estadisticas_cielo.csv")
+
+OBJIDS_PRIMERA_TANDA = [
+    "1237648674511454344", "1237648674529739178", "1237648675066675556",
+    "1237648702966988820", "1237648702967054406", "1237648702967251093",
+    "1237648702968103043", "1237648702968954880", "1237648702972297472",
+    "1237648704042434653"
+]
 
 MAX_ARCHIVOS = 100
 MAX_WORKERS = 8
 UMBRAL_MULT = 1.2
 LADO_P = 8
 LOTE_VISUALIZACION = 10
+
 ###########################################################################################
 
 def analizar_galaxia_rectangulo(file, cielo_dict):
@@ -84,7 +93,9 @@ def main():
         return
 
     all_files = sorted([f for f in os.listdir(DIR_IMAGENES) if f.lower().endswith(('.jpg', '.png'))])
-    files = all_files[:MAX_ARCHIVOS]
+    archivos_especificos = [f"{objid}.jpg" for objid in OBJIDS_PRIMERA_TANDA if f"{objid}.jpg" in all_files]
+    archivos_resto = [f for f in all_files if f not in archivos_especificos]
+    files = archivos_especificos + archivos_resto[:MAX_ARCHIVOS - len(archivos_especificos)]
     total_files = len(files)
 
     visualizacion_data = [] 
@@ -96,17 +107,20 @@ def main():
                 if res is not None:
                     visualizacion_data.append(res)
 
+    T_SUPERTITULO = 19
+    T_SUBTITULO = 13
+
     for i in range(0, len(visualizacion_data), LOTE_VISUALIZACION):
         batch = visualizacion_data[i:i + LOTE_VISUALIZACION]
         fig, axes = plt.subplots(2, 5, figsize=(20, 8))
-        fig.suptitle("Recorte mediante rectángulos", fontsize=16)
+        fig.suptitle("Recorte mediante rectángulos", fontsize=T_SUPERTITULO, y=0.98)
         axes = axes.flatten()
         
         for idx, (obj_id, img_array, mask_rect, c_x, c_y, rx, ry) in enumerate(batch):
             ax = axes[idx]
             h, w = img_array.shape[:2]
             ax.imshow(img_array.astype(np.uint8))
-            ax.set_title(f"({chr(97 + idx)}) ID: {obj_id}", fontsize=11)
+            ax.set_title(f"({chr(97 + idx)}) ID: {obj_id}", fontsize=T_SUBTITULO)
             ax.axis('off')
             
             for fila in range(-ry, ry + 1):
@@ -114,11 +128,14 @@ def main():
                     if abs(fila) == ry or abs(col) == rx:
                         py = max(0, min(c_y - (LADO_P // 2) + (fila * LADO_P), h - LADO_P))
                         px = max(0, min(c_x - (LADO_P // 2) + (col * LADO_P), w - LADO_P))
-                        cuadradito = patches.Rectangle((px, py), LADO_P, LADO_P, linewidth=1.2, edgecolor='yellow', facecolor='none', alpha=0.9)
+                        cuadradito = patches.Rectangle((px, py), LADO_P, LADO_P, linewidth=1, edgecolor='yellow', facecolor='none', alpha=0.7)
                         ax.add_patch(cuadradito)
+            
             ax.plot(c_x, c_y, marker='+', color='red', markersize=5)
-
-        for j in range(len(batch), len(axes)): axes[j].axis('off')
+                        
+        for idx in range(len(batch), len(axes)):
+            axes[idx].axis('off')
+            
         plt.tight_layout()
         plt.show()
 

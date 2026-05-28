@@ -10,23 +10,25 @@ from photutils.segmentation import detect_sources
 from scipy.ndimage import binary_fill_holes
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss") # Aquí ya se han filtrado las defectuosas
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_filtradas")
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV = os.path.join(DIR_CSV, "estadisticas_cielo.csv")
 
 OBJIDS_PRIMERA_TANDA = [
-    "1237648674511454464", "1237648674529739264", "1237648675066675456",
-    "1237648702966988800", "1237648702967054336", "1237648702967251200",
-    "1237648702968103168", "1237648702968954880", "1237648702972297472",
-    "1237648702972625152"
+    "1237648674511454344", "1237648674529739178", "1237648675066675556",
+    "1237648702966988820", "1237648702967054406", "1237648702967251093",
+    "1237648702968103043", "1237648702968954880", "1237648702972297472",
+    "1237648704042434653"
 ]
 
 MAX_ARCHIVOS = 100
 MAX_WORKERS = 8
 UMBRAL_MULT = 1.3
 LOTE_VISUALIZACION = 10
+
 ###########################################################################################
 
 def analizar_galaxia_elipse(file, cielo_dict):
@@ -118,28 +120,33 @@ def main():
                 if res is not None:
                     visualizacion_data.append(res)
 
+    T_SUPERTITULO = 19
+    T_SUBTITULO = 13
+
     for i in range(0, len(visualizacion_data), LOTE_VISUALIZACION):
         batch = visualizacion_data[i:i + LOTE_VISUALIZACION]
         fig, axes = plt.subplots(2, 5, figsize=(20, 8))
-        fig.suptitle("Recorte mediante ajuste elíptico", fontsize=16)
+        fig.suptitle("Recorte mediante ajuste elíptico", fontsize=T_SUPERTITULO, y=0.98)
         axes = axes.flatten()
         
         for idx, (obj_id, img_array, mask_elipse, mask_aislada, c_x, c_y) in enumerate(batch):
             ax = axes[idx]
             ax.imshow(img_array.astype(np.uint8))
-            ax.set_title(f"({chr(97 + idx)}) ID: {obj_id}", fontsize=11)
+            ax.set_title(f"({chr(97 + idx)}) ID: {obj_id}", fontsize=T_SUBTITULO)
             ax.axis('off')
             
             if np.any(mask_aislada):
                 ax.contour(mask_aislada, levels=[0.5], colors='magenta', linewidths=1.5, alpha=0.8)
             if np.any(mask_elipse):
                 ax.contour(mask_elipse, levels=[0.5], colors='cyan', linewidths=1.5, alpha=0.9)
+            
             ax.plot(c_x, c_y, marker='+', color='red', markersize=5)
 
-        for j in range(len(batch), len(axes)): axes[j].axis('off')
+        for j in range(len(batch), len(axes)): 
+            axes[j].axis('off')
         plt.tight_layout()
         plt.show()
-
+        
     print(f"Tiempo total: {time.time() - start_time:.2f} segundos")
 
 if __name__ == "__main__":

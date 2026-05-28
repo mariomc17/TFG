@@ -9,7 +9,7 @@ from PIL import Image
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_filtradas")
 OBJID_SELECCIONADO = "1237648703503794279"
 
 FIG_SIZE = (12, 12)
