@@ -13,8 +13,9 @@ import json
 import seaborn as sns
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
 
 DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_elipse") 
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
@@ -29,10 +30,11 @@ if not os.path.exists(DIR_CSV):
 
 MAX_ARCHIVOS = None
 LADO_P = 8
+
 ###########################################################################################
 
 plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['axes.edgecolor'] = '#333333'
+plt.rcParams['axes.edgecolor'] = "#000000"
 plt.rcParams['axes.linewidth'] = 1.2
 
 def main():
@@ -59,7 +61,7 @@ def main():
     if MAX_ARCHIVOS is not None:
         df_validos = df_validos.head(MAX_ARCHIVOS)
         
-    total_imgs = len(df_validos)
+    total_imgs = len(df_validos[:100])
     print(f"Se procesarán {total_imgs} imágenes.")
 
     total_parches_max = 64 * 64 

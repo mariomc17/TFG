@@ -9,9 +9,10 @@ from photutils.segmentation import detect_sources
 from scipy.ndimage import binary_fill_holes
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss") # Aquí ya se han filtrado las defectuosas
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_filtradas")
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV = os.path.join(DIR_CSV, "estadisticas_espiral.csv")
 DIR_SALIDA = os.path.join(REPO_ROOT, "galaxias_espiral")
@@ -22,6 +23,7 @@ if not os.path.exists(DIR_SALIDA):
 MAX_WORKERS = 8
 UMBRAL_MULT = 1.3
 MAX_ARCHIVOS = None 
+
 ###########################################################################################
 
 def analizar_galaxia_elipse(file, cielo_dict):
@@ -95,7 +97,7 @@ def main():
     start_time = time.time()
     
     if not os.path.exists(RUTA_CSV):
-        print(f"Error: mo se encuentra {RUTA_CSV}")
+        print(f"Error: no se encuentra {RUTA_CSV}")
         return
 
     df_cielo = pd.read_csv(RUTA_CSV)

@@ -23,7 +23,7 @@ def main():
                     stats = json.loads(f.attrs['stats'])
                     datos_fisica = f['fisica'][:]
                     
-                    df_raw = pd.DataFrame(datos_fisica, columns=columnas)
+                    df_raw = pd.DataFraAme(datos_fisica, columns=columnas)
         except Exception as e:
             print(f"Error al leer el HDF5: {e}")
 
@@ -33,10 +33,8 @@ def main():
 
     df_raw = df_raw[VARIABLES].dropna()
     n_vars = len(VARIABLES)
-
-    print(f"Generando visualización con valores físicos para {len(df_raw)} galaxias...")
     
-    with tqdm(total=n_vars + 1, desc="Generando histogramas", unit="paso") as pbar:
+    with tqdm(total=n_vars + 1, desc="...", unit="paso") as pbar:
         n_cols = min(3, n_vars) 
         n_rows = math.ceil(n_vars / n_cols)
         
@@ -49,7 +47,7 @@ def main():
             
             axes[i].set_title(f"{var}", fontsize=12)
             axes[i].set_xlabel(f"Valor original ({var})", fontsize=11)
-            axes[i].set_ylabel("Número de Galaxias", fontsize=11)
+            axes[i].set_ylabel("Número de galaxias", fontsize=11)
             axes[i].tick_params(labelsize=9)
             
             pbar.update(1)
@@ -60,11 +58,8 @@ def main():
         fig.suptitle(f"Análisis de variables astrofísicas", y=0.96, fontsize=18)
         fig.subplots_adjust(top=0.90, bottom=0.10, left=0.08, right=0.96, wspace=0.25, hspace=0.35)
 
-        pbar.set_description("Mostrando gráfico")
         plt.show()
         pbar.update(1)
-
-    print("¡Visualización completada exitosamente!")
 
 if __name__ == "__main__":
     main()
