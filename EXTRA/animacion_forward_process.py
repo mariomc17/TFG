@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
 DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_elipse")
 
 BETA_START = 0.0001
@@ -14,6 +15,7 @@ BETA_END = 0.02
 TIMESTEPS = 1000
 INSTANTES = [0, 100, 250, 500, 750, 999]
 IMG_SIZE = 512
+
 ###########################################################################################
 
 def linear_beta_schedule(timesteps):
@@ -53,7 +55,8 @@ def main():
     betas = linear_beta_schedule(TIMESTEPS)
 
     fig, axes = plt.subplots(1, len(INSTANTES), figsize=(18, 4))
-    fig.suptitle(f"Proceso de difusión (Forward Process) - {archivo_elegido}", fontsize=16)
+    nombre_sin_extension = archivo_elegido.rsplit('.', 1)[0]
+    fig.suptitle(f"Proceso de difusión (forward process) - {nombre_sin_extension}", fontsize=19)
 
     for i, t in enumerate(INSTANTES):
         if t == 0:
