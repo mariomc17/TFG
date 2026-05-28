@@ -25,7 +25,7 @@ class GalaxiasFisicasDataset(Dataset):
         self.augment = augment
         self.h5_file = None # Apertura "lazy" (perezosa) para evitar cuelgues con múltiples workers
 
-        # 1. Carga inicial de metadatos
+        # Carga inicial de metadatos
         with h5py.File(self.hdf5_path, 'r') as f:
             self.length = len(f['images'])
             self.columnas_fisicas = json.loads(f.attrs['columnas_fisicas'])
@@ -37,7 +37,7 @@ class GalaxiasFisicasDataset(Dataset):
         print(f"Dataset HDF5 cargado: {self.length} galaxias.")
         print(f"Variables elegidas: {self.variables_elegidas}")
 
-        # 2. Mapeo de índices de variables y errores
+        # Mapeo de índices de variables y errores
         self.indices_vars = []
         self.indices_errs = []
         for var in self.variables_elegidas:
@@ -50,11 +50,11 @@ class GalaxiasFisicasDataset(Dataset):
             else:
                 self.indices_errs.append(-1)
 
-        # 3. Cálculo de estadísticos
+        # Cálculo de estadísticos
         self.norm_stats = self._compute_norm_stats(fisica_all)
         self.use_err_aug = self._detect_usable_errors(fisica_all)
 
-        # Transformaciones de imagen (sin rombos) ──
+        # Transformaciones de imagen
         aug_transforms = []
         if self.augment:
             # MEJORA SOTA: las galaxias no tienen "arriba" o "abajo" en el espacio.

@@ -5,7 +5,7 @@ from astroquery.sdss import SDSS
 
 ###########################################################################################
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "csv"))
+BASE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..\..", "csv"))
 OUTPUT_FILE = "galaxias_sdss.csv"
 CSV_PATH = os.path.join(BASE_DIR, OUTPUT_FILE)
 
@@ -23,19 +23,19 @@ SELECT TOP 30000
     s.z AS REDSHIFT,
     s.zErr AS REDSHIFT_ERR,
 
-    -- 2. MASA ESTELAR (Error simétrico 1-sigma)
+    -- 2. MASA ESTELAR
     m.logMass AS LOG_MS, 
     (m.maxLogMass - m.minLogMass) / 2.0 AS LOG_MS_ERR,
     
-    -- 3. TASA DE FORMACIÓN ESTELAR (MPA-JHU)
+    -- 3. TASA DE FORMACIÓN ESTELAR
     e.sfr_tot_p50 AS SFR,
     (e.sfr_tot_p84 - e.sfr_tot_p16) / 2.0 AS SFR_ERR,
 
-    -- 4. EDAD ESTELAR (Error heurístico)
+    -- 4. EDAD ESTELAR
     m.age AS EA,
     1.5 AS EA_ERR,
 
-    -- 5. METALICIDAD (Error heurístico)
+    -- 5. METALICIDAD
     m.metallicity AS MET,
     0.15 AS MET_ERR,
 
