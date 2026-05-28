@@ -7,9 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss")
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
 DIR_TXT = os.path.join(REPO_ROOT, "txt")
 NOMBRE_TXT = "galaxias_artefactos.txt"
 TXT_PATH = os.path.join(DIR_TXT, NOMBRE_TXT)
@@ -23,6 +24,7 @@ AREA_MINIMA_COLOR = 150
 LONGITUD_LINEA = 215
 GAP_LINEA = 20
 MAX_WORKERS = 8
+
 ###########################################################################################
 
 LISTA_TRAZOS = []

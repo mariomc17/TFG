@@ -5,7 +5,6 @@ import shutil
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
-
 DIR_ORIGEN = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
 DIR_DESTINO = os.path.join(REPO_ROOT, "galaxias_moradas")
 TXT_PATH = os.path.join(REPO_ROOT, "txt", "galaxias_moradas.txt")

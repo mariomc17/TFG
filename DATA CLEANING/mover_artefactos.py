@@ -2,14 +2,15 @@ import os
 import shutil
 
 ###########################################################################################
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 
-DIR_ORIGEN = os.path.join(REPO_ROOT, "jpg_sdss")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_ORIGEN = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
 DIR_DESTINO = os.path.join(REPO_ROOT, "galaxias_artefactos")
 TXT_PATH = os.path.join(REPO_ROOT, "txt", "galaxias_artefactos.txt")
 
 os.makedirs(DIR_DESTINO, exist_ok=True)
+
 ###########################################################################################
 
 def main():
@@ -17,7 +18,7 @@ def main():
     no_encontradas = 0
 
     if not os.path.exists(TXT_PATH):
-        print(f"Error: No se encuentra el archivo {TXT_PATH}")
+        print(f"Error: no se encuentra el archivo {TXT_PATH}")
         return
 
     with open(TXT_PATH, 'r') as f:
