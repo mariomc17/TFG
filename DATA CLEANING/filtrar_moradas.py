@@ -10,9 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss")
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
 DIR_TXT = os.path.join(REPO_ROOT, "txt")
 NOMBRE_TXT = "galaxias_moradas.txt"
 TXT_PATH = os.path.join(DIR_TXT, NOMBRE_TXT)
@@ -22,6 +23,7 @@ if not os.path.exists(DIR_TXT):
 
 UMBRAL_VERDE = 0.48
 MAX_WORKERS = 8
+
 ###########################################################################################
 
 VALORES = []
@@ -74,28 +76,45 @@ def main():
     with open(TXT_PATH, 'w') as f:
         for item in lista_borrar:
             f.write(f"{item}\n")
+    
+    T_SUPERTITULO = 19
+    T_SUBTITULO = 16
+    T_EJES = 14.5
+    T_TICKS_LEYENDA = 13
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    fig.suptitle('Distribución del Ratio Verde (RV)', fontsize=16)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+    fig.suptitle('Análisis de distribución del Ratio Verde ($RV$)', fontsize=T_SUPERTITULO, y=0.98)
     
     data = df['Ratio_Verde'].dropna()
 
-    c1, b1, p1 = ax1.hist(data, bins=60, color='mediumseagreen', edgecolor='black', alpha=0.8)
-    ax1.axvline(x=UMBRAL_VERDE, color='crimson', linestyle='dashed', linewidth=2)
-    ax1.set_title('Escala Lineal')
+    c1, b1, p1 = ax1.hist(data, bins=60, color='mediumseagreen', edgecolor='black', alpha=0.8, zorder=3)
+    ax1.axvline(x=UMBRAL_VERDE, color='crimson', linestyle='dashed', linewidth=2, zorder=4, label=f'Umbral descarte ($RV = {UMBRAL_VERDE}$)')
+    ax1.set_title('Distribución lineal', fontsize=T_SUBTITULO)
+    ax1.set_xlabel('Ratio Verde ($RV$)', fontsize=T_EJES)
+    ax1.set_ylabel('Nº de galaxias (Escala lineal)', fontsize=T_EJES)
+    ax1.grid(axis='y', color='gray', linestyle=':', linewidth=0.7, alpha=0.7, zorder=1)
+    ax1.tick_params(axis='both', labelsize=T_TICKS_LEYENDA)
+    ax1.legend(fontsize=T_TICKS_LEYENDA, loc='upper left')
+    
     for count, edge, patch in zip(c1, b1, p1):
         if edge < UMBRAL_VERDE:
             patch.set_facecolor('crimson')
 
-    c2, b2, p2 = ax2.hist(data, bins=60, color='mediumseagreen', edgecolor='black', alpha=0.8)
-    ax2.axvline(x=UMBRAL_VERDE, color='crimson', linestyle='dashed', linewidth=2)
+    c2, b2, p2 = ax2.hist(data, bins=60, color='mediumseagreen', edgecolor='black', alpha=0.8, zorder=3)
+    ax2.axvline(x=UMBRAL_VERDE, color='crimson', linestyle='dashed', linewidth=2, zorder=4, label=f'Umbral descarte ($RV = {UMBRAL_VERDE}$)')
     ax2.set_yscale('log')
-    ax2.set_title('Escala Logarítmica')
+    ax2.set_title('Distribución logarítmica', fontsize=T_SUBTITULO)
+    ax2.set_xlabel('Ratio Verde ($RV$)', fontsize=T_EJES)
+    ax2.set_ylabel('Nº de galaxias (Escala logarítmica)', fontsize=T_EJES)
+    ax2.grid(axis='y', which='both', color='gray', linestyle=':', linewidth=0.7, alpha=0.7, zorder=1)
+    ax2.tick_params(axis='both', labelsize=T_TICKS_LEYENDA)
+    ax2.legend(fontsize=T_TICKS_LEYENDA, loc='upper right')
+    
     for count, edge, patch in zip(c2, b2, p2):
         if edge < UMBRAL_VERDE:
             patch.set_facecolor('crimson')
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.tight_layout()
     plt.show()
 
     fin = time.time()
