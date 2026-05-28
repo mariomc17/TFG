@@ -6,13 +6,15 @@ import astropy.units as u
 from tqdm import tqdm
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
 DIR_CSV = os.path.join(REPO_ROOT, "csv")
 RUTA_CSV_SDSS = os.path.join(DIR_CSV, "galaxias_sdss.csv")
 
 BINNING_FACTOR = 4
 ESCALA_NATIVA = 0.15
+
 ###########################################################################################
 
 def calcular_escala_fisica(redshift: float, binning_factor: int = 4) -> float:
