@@ -1,5 +1,4 @@
 import os
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -7,13 +6,16 @@ import matplotlib.patheffects as pe
 from PIL import Image
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DIR_IMAGENES = os.path.join(REPO_ROOT, "jpg_sdss")
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..\.."))
+DIR_IMAGENES = os.path.join(REPO_ROOT, "galaxias_sdss_sin_filtrar")
+OBJID_SELECCIONADO = "1237648703503794279"
 
 FIG_SIZE = (12, 12)
 DIVISOR_AREA = 50
 DEFAULT_SIZE = 512
+
 ###########################################################################################
 
 def main():
@@ -21,12 +23,22 @@ def main():
         print(f"Error: no se encuentra la carpeta {DIR_IMAGENES}")
         return
 
-    archivos = [f for f in os.listdir(DIR_IMAGENES) if f.lower().endswith(('.jpg', '.png'))]
-    if not archivos:
-        print(f"Error: no hay imágenes en {DIR_IMAGENES}")
-        return
+    archivo_elegido = None
+    for f in os.listdir(DIR_IMAGENES):
+        if f.startswith(OBJID_SELECCIONADO) and f.lower().endswith(('.jpg', '.png')):
+            archivo_elegido = f
+            break
 
-    archivo_elegido = random.choice(archivos)
+    if archivo_elegido is None:
+        print(f"Error: no se ha encontrado la galaxia {OBJID_SELECCIONADO} en {DIR_IMAGENES}")
+        print("Se procederá con una muestra aleatoria para evitar el colapso del script.")
+        archivos = [f for f in os.listdir(DIR_IMAGENES) if f.lower().endswith(('.jpg', '.png'))]
+        if not archivos:
+            print("Error: la carpeta de imágenes está completamente vacía.")
+            return
+        import random
+        archivo_elegido = random.choice(archivos)
+
     obj_id = archivo_elegido.split('.')[0]
     ruta_imagen = os.path.join(DIR_IMAGENES, archivo_elegido)
 
@@ -53,6 +65,9 @@ def main():
         secciones_cielo.append((j * lado, 0))          
         secciones_cielo.append((j * lado, w - lado))   
 
+    T_SUPERTITULO = 19
+    T_TEXTO_PARCHE = 13
+
     fig, ax = plt.subplots(figsize=FIG_SIZE)
     ax.imshow(img_array.astype(np.uint8))
 
@@ -67,9 +82,9 @@ def main():
         centro_y = y + (lado / 2)
         texto_etiqueta = f"Sec {idx}\n$\\mu$={media_parche:.1f}"
         
-        ax.text(centro_x, centro_y, texto_etiqueta, color='white', fontsize=13, fontweight='bold', ha='center', va='center', path_effects=[pe.withStroke(linewidth=3, foreground="black")])
+        ax.text(centro_x, centro_y, texto_etiqueta, color='white', fontsize=T_TEXTO_PARCHE, fontweight='bold', ha='center', va='center', path_effects=[pe.withStroke(linewidth=3, foreground="black")])
 
-    ax.set_title(f"Esquema de la división de la imagen - {obj_id}", fontsize=16)
+    ax.set_title(f"Esquema de la división del fondo - {obj_id}", fontsize=T_SUPERTITULO)
     ax.axis('off') 
 
     plt.tight_layout()
