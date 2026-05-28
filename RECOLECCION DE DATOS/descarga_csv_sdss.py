@@ -4,6 +4,7 @@ import pandas as pd
 from astroquery.sdss import SDSS
 
 ###########################################################################################
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..\..", "csv"))
 OUTPUT_FILE = "galaxias_sdss.csv"
@@ -11,6 +12,7 @@ CSV_PATH = os.path.join(BASE_DIR, OUTPUT_FILE)
 
 if not os.path.exists(BASE_DIR):
     os.makedirs(BASE_DIR)
+
 ###########################################################################################
 
 query = """
