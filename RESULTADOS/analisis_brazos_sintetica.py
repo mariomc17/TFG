@@ -101,7 +101,7 @@ def analizar_galaxia_sintetica(img_path):
     id_plot = f"Sintética ({nombre_archivo})"
 
     fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 9), gridspec_kw={'width_ratios': [1, 1.5]})
-    fig1.suptitle(f"Análisis RGB - {id_plot}", fontsize=T_SUPERTITULO, y=0.98)
+    fig1.suptitle(f"Análisis RGB - Sintética 1", fontsize=T_SUPERTITULO)
     
     ax1.imshow(img); ax1.axis('off')
     ax1.set_title("Morfología y muestreo", fontsize=T_SUBTITULO)
