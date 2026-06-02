@@ -3,10 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# 1. Time Embedding (El reloj del ruido)
-
 class SinusoidalEmbedding(nn.Module):
-    """MEJORA SOTA: Embeddings sinusoidales puros (Vaswani et al. 2017)."""
     def __init__(self, dim: int):
         super().__init__()
         self.dim = dim
@@ -14,25 +11,19 @@ class SinusoidalEmbedding(nn.Module):
     def forward(self, t: torch.Tensor) -> torch.Tensor:
         device = t.device
         half = self.dim // 2
-        # Frecuencias logarítmicas para abarcar todo el espectro temporal
         freqs = torch.exp(
             -math.log(10000) * torch.arange(half, device=device).float() / (half - 1)
         )
         args = t[:, None].float() * freqs[None, :]
-        return torch.cat([args.sin(), args.cos()], dim=-1)  # [B, dim]
+        return torch.cat([args.sin(), args.cos()], dim=-1)
     
-# 2. ResBlock con Adaptive Group Normalization Zero-Init (AdaGN-Zero)
-
 class ResBlock(nn.Module):
     def __init__(self, in_ch: int, out_ch: int, cond_dim: int, num_groups: int = 32, dropout: float = 0.1):
         super().__init__()
-        # MEJORA SOTA: GroupNorm en lugar de BatchNorm
         self.norm1 = nn.GroupNorm(num_groups, in_ch)
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
 
-        # MEJORA SOTA (AdaGN-Zero): proyectamos la física+tiempo para modular el GN2.
         self.cond_proj = nn.Linear(cond_dim, out_ch * 2)
-        # INICIALIZACIÓN A CERO: Estabilidad extrema al inicio del training
         nn.init.zeros_(self.cond_proj.weight)
         nn.init.zeros_(self.cond_proj.bias)
 
@@ -40,26 +31,19 @@ class ResBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
 
-        # MEJORA SOTA: conexión residual
         self.skip = nn.Conv2d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
-        self.act = nn.SiLU() # SiLU es más suave que ReLU, ideal para difusión
+        self.act = nn.SiLU()
 
     def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
-        # 1. Camino principal: normaliza, activa, convoluciona
         h = self.conv1(self.act(self.norm1(x)))
 
-        # 2. Inyección de física (AdaGN): modulamos el GroupNorm 2
         scale, shift = self.cond_proj(cond).chunk(2, dim=1)
         h = self.norm2(h) * (1.0 + scale[:, :, None, None]) + shift[:, :, None, None]
 
-        # 3. Final del camino principal
         h = self.conv2(self.dropout(self.act(h)))
 
-        # 4. Entrada + Camino principal
         return h + self.skip(x)
     
-# 3. Self-Attention Block (Para los brazos espirales)
-
 class SelfAttentionBlock(nn.Module):
     def __init__(self, channels: int, num_heads: int = 8, num_groups: int = 32):
         super().__init__()
@@ -67,17 +51,14 @@ class SelfAttentionBlock(nn.Module):
         self.head_dim = channels // num_heads
 
         self.norm = nn.GroupNorm(num_groups, channels)
-        # Calculamos Query, Key y Value de golpe (más eficiente)
         self.qkv = nn.Conv1d(channels, channels * 3, 1, bias=False)
 
-        # Proyección de salida inicializada a cero (estabilidad SOTA)
         self.out_proj = nn.Conv1d(channels, channels, 1)
         nn.init.zeros_(self.out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, C, H, W = x.shape
-        # Aplanamos la imagen 2D a una secuencia 1D para la atención
         h = self.norm(x).view(B, C, H * W)
 
         q, k, v = self.qkv(h).chunk(3, dim=1)
@@ -85,18 +66,14 @@ class SelfAttentionBlock(nn.Module):
         k = k.view(B, self.num_heads, self.head_dim, H * W).permute(0, 1, 3, 2)
         v = v.view(B, self.num_heads, self.head_dim, H * W).permute(0, 1, 3, 2)
 
-        # MEJORA SOTA: Flash Attention (Ultra rápido, nativo en PyTorch 2.0)
         out = F.scaled_dot_product_attention(q, k, v) 
 
         out = out.permute(0, 1, 3, 2).reshape(B, C, H * W)
         out = self.out_proj(out).view(B, C, H, W)
 
-        return x + out # Conexión residual
+        return x + out
     
-# 4. Módulos de up/downsampling SOTA
-
 class Downsample(nn.Module):
-    """MEJORA SOTA: Downsampling aprendido (Stride-2 Conv) en vez de MaxPool."""
     def __init__(self, channels: int):
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, 3, stride=2, padding=1)
@@ -105,7 +82,6 @@ class Downsample(nn.Module):
         return self.conv(x)
 
 class Upsample(nn.Module):
-    """MEJORA SOTA: Interpolación Bilinear + Conv para evitar 'tablero de ajedrez'."""
     def __init__(self, channels: int):
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, 3, padding=1)
@@ -114,14 +90,11 @@ class Upsample(nn.Module):
         x = F.interpolate(x, scale_factor=2.0, mode="nearest")
         return self.conv(x)
 
-# 5. U-Net Principal
-
 class CustomGalaxyUNet(nn.Module):
     def __init__(self, n_channels: int = 3, n_classes: int = 3, embed_dim: int = 256, dropout: float = 0.1):
         super().__init__()
-        D = embed_dim  # Dimensión del vector unificado (Física + Tiempo)
+        D = embed_dim
 
-        # Time embedding (Pasa de Dim a 4xDim por convención SOTA)
         self.time_mlp = nn.Sequential(
             SinusoidalEmbedding(D),
             nn.Linear(D, D * 4),
@@ -129,7 +102,6 @@ class CustomGalaxyUNet(nn.Module):
             nn.Linear(D * 4, D),
         )
 
-        # ENCODER (Bajada)
         self.inc = nn.Conv2d(n_channels, 128, 3, padding=1)
         
         self.enc0_a = ResBlock(128, 128, D, dropout=dropout)
@@ -144,48 +116,41 @@ class CustomGalaxyUNet(nn.Module):
         self.enc2_b = ResBlock(256, 256, D, dropout=dropout)
         self.enc2_dn = Downsample(256)
 
-        # L3: Aquí entra la Self-Attention (16x16)
         self.enc3_a = ResBlock(256, 512, D, dropout=dropout)
         self.enc3_sa1 = SelfAttentionBlock(512)
         self.enc3_b = ResBlock(512, 512, D, dropout=dropout)
         self.enc3_sa2 = SelfAttentionBlock(512)
         self.enc3_dn = Downsample(512)
 
-        # CUELLO DE BOTELLA (Fondo de la 'U', 8x8)
         self.mid_a = ResBlock(512, 512, D, dropout=dropout)
         self.mid_sa = SelfAttentionBlock(512)
         self.mid_b = ResBlock(512, 512, D, dropout=dropout)
 
-        # DECODER (Subida)
-        # En la subida, concatenamos el tensor actual con el "skip" de la bajada
         self.dec3_up = Upsample(512)
-        self.dec3_a = ResBlock(512 + 512, 512, D, dropout=dropout) # 1024 -> 512
+        self.dec3_a = ResBlock(512 + 512, 512, D, dropout=dropout)
         self.dec3_sa1 = SelfAttentionBlock(512)
         self.dec3_b = ResBlock(512, 512, D, dropout=dropout)
         self.dec3_sa2 = SelfAttentionBlock(512)
 
         self.dec2_up = Upsample(512)
-        self.dec2_a = ResBlock(512 + 256, 256, D, dropout=dropout) # 768 -> 256
+        self.dec2_a = ResBlock(512 + 256, 256, D, dropout=dropout)
         self.dec2_b = ResBlock(256, 256, D, dropout=dropout)
 
         self.dec1_up = Upsample(256)
-        self.dec1_a = ResBlock(256 + 256, 256, D, dropout=dropout) # 512 -> 256
+        self.dec1_a = ResBlock(256 + 256, 256, D, dropout=dropout)
         self.dec1_b = ResBlock(256, 256, D, dropout=dropout)
 
         self.dec0_up = Upsample(256)
-        self.dec0_a = ResBlock(256 + 128, 128, D, dropout=dropout) # 384 -> 128
+        self.dec0_a = ResBlock(256 + 128, 128, D, dropout=dropout)
         self.dec0_b = ResBlock(128, 128, D, dropout=dropout)
 
-        # OUTPUT
         self.out_norm = nn.GroupNorm(32, 128)
         self.outc = nn.Conv2d(128, n_classes, 1)
 
     def forward(self, x: torch.Tensor, cond_emb: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
-        # MEJORA SOTA: Conditioning Unificado. Sumamos Física + Tiempo.
         t = self.time_mlp(timesteps)
         cond = t + cond_emb 
 
-        # Bajada
         x0 = self.inc(x)
         x0 = self.enc0_a(x0, cond)
         x0 = self.enc0_b(x0, cond)
@@ -204,13 +169,11 @@ class CustomGalaxyUNet(nn.Module):
         x3 = self.enc3_b(x3, cond)
         x3 = self.enc3_sa2(x3)
 
-        # Fondo
         xm = self.enc3_dn(x3)
         xm = self.mid_a(xm, cond)
         xm = self.mid_sa(xm)
         xm = self.mid_b(xm, cond)
 
-        # Subida (Concatenando el Skip Connection)
         h = self.dec3_up(xm)
         h = torch.cat([h, x3], dim=1) 
         h = self.dec3_a(h, cond)
@@ -233,5 +196,4 @@ class CustomGalaxyUNet(nn.Module):
         h = self.dec0_a(h, cond)
         h = self.dec0_b(h, cond)
 
-        # Salida
         return self.outc(F.silu(self.out_norm(h)))
