@@ -19,13 +19,10 @@ from tqdm import tqdm
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Configuración (DataClasses)
-
 @dataclass
 class DataCfg:
     hdf5_path: str = "dataset_galaxias_sin_rgb.h5"
     img_size: int = 128
-    # MEJORA SOTA: añadimos RADIO_P (tamaño angular real)
     variables: List[str] = field(
         default_factory=lambda: ["ESCALA_KPC_PX", "LOG_MS", "EA", "RADIO_P"]
     )
@@ -35,8 +32,8 @@ class DataCfg:
 @dataclass
 class TrainCfg:
     batch_size: int = 32
-    epochs: int = 200 # Más épocas porque el proceso es más suave
-    lr: float = 1e-4 # Learning rate más bajo y estable
+    epochs: int = 200
+    lr: float = 1e-4
     save_every: int = 10
     patience: int = 20
     min_delta: float = 1e-5
@@ -44,7 +41,6 @@ class TrainCfg:
     compile: bool = True
     dropout: float = 0.1
     cfg_drop_prob: float = 0.15
-    # MEJORA SOTA: hiperparámetros para la Media Móvil Exponencial (EMA)
     ema_decay: float = 0.9999
     ema_warmup_steps: int = 1000
 
@@ -65,13 +61,10 @@ class Config:
     model: ModelCfg = field(default_factory=ModelCfg)
     diffusion: DiffusionCfg = field(default_factory=DiffusionCfg)
 
-# Clases SOTA (Projector + EMA)
 
 class PhysicsProjector(nn.Module):
     def __init__(self, input_dim: int, embed_dim: int = 256):
         super().__init__()
-        # MEJORA SOTA: Null Tokens aprendibles en lugar de vectores a cero.
-        # Se inicializan con randn para simular la distribución Z-Score normal.
         self.null_tokens = nn.Parameter(torch.randn(input_dim))
         self.net = nn.Sequential(
             nn.Linear(input_dim, 256),
@@ -82,17 +75,13 @@ class PhysicsProjector(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, drop_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-            # Si estamos aplicando CFG (15% de las veces), sustituimos la física
-            # real por los "null tokens" aprendibles.
             if drop_mask is not None and drop_mask.any():
                 null = self.null_tokens.unsqueeze(0).expand(x.shape[0], -1)
-                # torch.where: (condicion, valor_si_es_verdad, valor_si_es_falso)
                 x = torch.where(drop_mask[:, None], null, x)
             return self.net(x)
 
     @torch.no_grad()
     def get_null_embedding(self, batch_size: int, device: torch.device) -> torch.Tensor:
-        """Extrae el token incondicional puro para la inferencia."""
         null_vec = self.null_tokens.unsqueeze(0).expand(batch_size, -1).to(device)
         return self.net(null_vec)
 
@@ -109,9 +98,7 @@ class EMAModel:
 
     @torch.no_grad()
     def update(self, model: nn.Module):
-        """Mezclamos los pesos viejos con los nuevos suavemente en cada batch."""
         self.step += 1
-        # Warm-up de Karras et al.: empieza mezclando rápido y luego se asienta
         decay = min(self.decay, (1.0 + self.step) / (10.0 + self.step))
         for name, param in model.named_parameters():
             if not param.requires_grad or name not in self.shadow:
@@ -122,7 +109,6 @@ class EMAModel:
             )
 
     def copy_to(self, model: nn.Module):
-        """Inyecta los pesos promediados de vuelta a una red para guardarla."""
         for name, param in model.named_parameters():
             if name in self.shadow:
                 param.data.copy_(self.shadow[name].to(param.device))
@@ -135,7 +121,6 @@ class EMAModel:
     
     @classmethod
     def from_state_dict(cls, state: dict, model: nn.Module) -> "EMAModel":
-        """Reconstruye EMAModel desde un state_dict guardado."""
         ema = cls(
             model,
             decay=state["decay"],
@@ -146,7 +131,6 @@ class EMAModel:
         return ema
 
 def get_raw_model(model: nn.Module) -> nn.Module:
-    """Devuelve el modelo sin wrapper de torch.compile."""
     return model._orig_mod if hasattr(model, "_orig_mod") else model
 
 def get_raw_state_dict(model: nn.Module) -> dict:
@@ -195,25 +179,21 @@ def autocast_context(device: torch.device, enabled: bool):
     return torch.cuda.amp.autocast(dtype=torch.float16, enabled=True)
 
 def build_checkpoint(unet, unet_raw, projector, ema, dataset, cfg, epoch, mean_loss, best_loss) -> dict:
-    # 1. Copiamos la estructura cruda
     unet_ema_save = copy.deepcopy(unet_raw)
-    # 2. Le inyectamos los pesos estabilizados del EMA
     ema.copy_to(unet_ema_save)
     
     return {
-        "unet_ema": unet_ema_save.state_dict(), # Pesos de inferencia
-        "unet": get_raw_state_dict(unet),       # Pesos para continuar training
+        "unet_ema": unet_ema_save.state_dict(),
+        "unet": get_raw_state_dict(unet),     
         "projector": projector.state_dict(),
         "ema_state": ema.state_dict(),
         "variables": list(cfg.data.variables),
-        "norm_stats": dataset.norm_stats,       # MEJORA SOTA: imprescindible para inferencia
+        "norm_stats": dataset.norm_stats, 
         "epoch": epoch,
         "mean_loss": mean_loss,
         "best_loss": best_loss,
         "config": OmegaConf.to_container(cfg, resolve=True),
     }
-
-# Bucle principal de Entrenamiento
 
 def main():
     args, overrides = parse_args()
@@ -305,11 +285,9 @@ def main():
             noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
             optimizer.zero_grad(set_to_none=True)
 
-            # CFG Dropout con Learnable Null Tokens
             drop_mask = torch.rand(bsz, device=device) < cfg.train.cfg_drop_prob
 
             with autocast_context(device, cfg.train.amp):
-                # El proyector ahora se encarga de inyectar los null tokens si drop_mask es True
                 cond_emb = projector(phys_vectors, drop_mask=drop_mask)
                 pred = unet(x=noisy_images, cond_emb=cond_emb, timesteps=timesteps)
                 target = noise_scheduler.get_velocity(clean_images, noise, timesteps)
@@ -324,7 +302,6 @@ def main():
                 loss = (loss * snr_weight).mean()
 
             scaler.scale(loss).backward()
-            # MEJORA SOTA: Gradient Clipping para evitar colapsos matemáticos
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(
                 list(unet.parameters()) + list(projector.parameters()), max_norm=1.0,
@@ -332,7 +309,6 @@ def main():
             scaler.step(optimizer)
             scaler.update()
 
-            # MEJORA SOTA: actualizamos la copia fantasma (EMA) en cada paso
             ema.update(unet_raw)
 
             epoch_loss += loss.item()
